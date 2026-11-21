@@ -10,6 +10,7 @@ from core.llm.schema import LLMResponseError, LLMResult
 from core.models import AppSettings
 from correspondence import assist
 from correspondence.models import Message, Template
+from correspondence.services import create_draft_message
 
 
 def _enable_ollama():
@@ -94,8 +95,56 @@ def test_create_ai_draft_sets_provenance(case, user, profile):
     assert message.body == "Hello Test Person"
     assert AuditLog.objects.filter(action="message.ai_draft").exists()
     assert CaseEvent.objects.filter(
-        case=case, summary__startswith="AI-assisted draft prepared"
+        case=case, summary__startswith="AI-generated draft prepared"
     ).exists()
+
+
+def test_message_source_labels(case, user, profile, templates):
+    template = Template.objects.get(slug="access-request", locale="en", version=1)
+
+    ai_message = assist.create_ai_draft(
+        case,
+        subject="AI letter",
+        body="AI body",
+        provider="ollama",
+        model="llama3.1:8b",
+        template=template,
+        actor=user,
+    )
+    assert ai_message.source_label == "AI-generated"
+    assert ai_message.source_detail == "ollama · llama3.1:8b"
+
+    template_message = create_draft_message(case, template, actor=user)
+    assert template_message.source_label == "From template"
+    assert template_message.source_detail == f"{template.name} v{template.version}"
+
+    free_message = Message.objects.create(case=case, subject="Free", body="Free body")
+    assert free_message.source_label == "Free text"
+    assert free_message.source_detail == ""
+
+
+def test_message_detail_shows_ai_provenance(client_logged_in, case, user, profile):
+    message = assist.create_ai_draft(
+        case,
+        subject="AI letter",
+        body="AI body",
+        provider="ollama",
+        model="llama3.1:8b",
+        actor=user,
+    )
+    response = client_logged_in.get(reverse("message-detail", args=[case.pk, message.pk]))
+    assert response.status_code == 200
+    assert b"AI-generated" in response.content
+    assert b"ollama" in response.content
+
+
+def test_message_detail_shows_template_provenance(client_logged_in, case, user, profile, templates):
+    template = Template.objects.get(slug="access-request", locale="en", version=1)
+    message = create_draft_message(case, template, actor=user)
+    response = client_logged_in.get(reverse("message-detail", args=[case.pk, message.pk]))
+    assert response.status_code == 200
+    assert b"From template" in response.content
+    assert b"no AI used" in response.content
 
 
 def test_apply_ai_scope_updates_case_and_audit(case, user):
@@ -191,6 +240,7 @@ def test_ai_generate_view_returns_partial(client_logged_in, case, enabled_ai, mo
     assert response.status_code == 200
     assert b"All records for my account." in response.content
     assert b"Use this scope" in response.content
+    assert b"AI responded" in response.content
 
 
 def test_ai_generate_view_reports_disabled(client_logged_in, case):
@@ -272,13 +322,108 @@ def test_ai_template_body_can_be_rewritten(
     )
     assert response.status_code == 200
     assert b"Better" in response.content
+    assert b"AI-generated draft" in response.content
+    assert b"AI wrote this letter" in response.content
+    assert b"Template: Access request v1" in response.content
 
 
-def test_compose_page_renders_ai_panel(client_logged_in, case, profile, templates, enabled_ai):
+def test_prompt_uses_template_as_base(case, profile, templates):
+    template = Template.objects.get(slug="access-request", locale="en", version=1)
+    bundle = assist.build_prompt(
+        case,
+        mode="draft",
+        locale="en",
+        scope="Account other@example.com since 2019.",
+        template_subject=template.subject,
+        template_body=template.body,
+    )
+    assert "BASE TEMPLATE" in bundle.user
+    assert "the purposes of the processing;" in bundle.user
+    assert "Account other@example.com since 2019." in bundle.user
+    assert "Account me@example.com and purchase history since 2020." not in bundle.user
+
+
+def test_generate_view_combines_template_and_scope(
+    client_logged_in, case, enabled_ai, templates, monkeypatch
+):
+    template = Template.objects.get(slug="access-request", locale="en", version=1)
+    captured: dict = {}
+
+    def fake_generate(system, prompt, *, config=None, json_mode=True):
+        captured["prompt"] = prompt
+        return LLMResult(
+            text='{"subject": "Access", "body": "Hello {{ profile.full_name }}", "scope": ""}',
+            provider="ollama",
+            model="llama3.1:8b",
+            duration_ms=5,
+        )
+
+    monkeypatch.setattr(llm, "generate", fake_generate)
+    response = client_logged_in.post(
+        reverse("case-ai-generate", args=[case.pk]),
+        {
+            "mode": "draft",
+            "template": template.pk,
+            "scope": "My other account, other@example.com.",
+            "extra_note": "Mention the old newsletter.",
+        },
+    )
+    assert response.status_code == 200
+    assert "BASE TEMPLATE" in captured["prompt"]
+    assert "the purposes of the processing;" in captured["prompt"]
+    assert "My other account, other@example.com." in captured["prompt"]
+    assert "Mention the old newsletter." in captured["prompt"]
+
+
+def test_template_preview_editor_saves_edits(client_logged_in, case, profile, templates):
+    template = Template.objects.get(slug="access-request", locale="en", version=1)
+    response = client_logged_in.post(
+        reverse("case-compose", args=[case.pk]),
+        {"template": template.pk, "action": "preview"},
+    )
+    assert response.status_code == 200
+    assert b"preview-body" in response.content
+
+    response = client_logged_in.post(
+        reverse("case-compose", args=[case.pk]),
+        {
+            "action": "save",
+            "template": template.pk,
+            "to_address": "privacy@example.com",
+            "subject": "Edited subject",
+            "body": "Edited body",
+        },
+    )
+    assert response.status_code == 302
+    message = Message.objects.get(case=case)
+    assert message.subject == "Edited subject"
+    assert message.body == "Edited body"
+    assert message.template == template
+
+
+def test_ai_save_links_the_template_version(client_logged_in, case, enabled_ai, templates):
+    template = Template.objects.get(slug="access-request", locale="en", version=1)
+    response = client_logged_in.post(
+        reverse("case-ai-save", args=[case.pk]),
+        {
+            "subject": "Access request",
+            "body": "Dear {{ organization.name }}, please provide my data.",
+            "template": template.pk,
+        },
+    )
+    assert response.status_code == 302
+    message = Message.objects.get(case=case)
+    assert message.template == template
+    assert message.template_version == template.version
+    assert message.ai_generated is True
+
+
+def test_compose_page_renders_ai_first_form(client_logged_in, case, profile, templates, enabled_ai):
     response = client_logged_in.get(reverse("case-compose", args=[case.pk]))
     assert response.status_code == 200
-    assert b"AI assistance" in response.content
-    assert b"Generate" in response.content
+    assert b"Write the letter" in response.content
+    assert b"Generate letter" in response.content
+    assert b"Fill from template" in response.content
     assert b"Points to emphasise" in response.content
 
 
@@ -287,8 +432,9 @@ def test_compose_page_without_templates_still_allows_ai(
 ):
     response = client_logged_in.get(reverse("case-compose", args=[case.pk]))
     assert response.status_code == 200
-    assert b"No active template exists" in response.content
-    assert b"AI assistance" in response.content
+    assert b"No template (draft from scratch)" in response.content
+    assert b"Generate letter" in response.content
+    assert b"Fill from template" not in response.content
 
 
 def test_settings_shows_configured_key(client_logged_in, db, monkeypatch):

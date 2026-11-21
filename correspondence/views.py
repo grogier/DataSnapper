@@ -166,21 +166,24 @@ def compose(request, pk):
         return redirect("settings")
 
     llm_settings = assist.ai_context(case)
-    ai_templates = Template.objects.filter(right=case.right, is_active=True).order_by(
-        "locale", "name", "-version"
-    )
-    if not ai_templates and not llm_settings["enabled"]:
+    ai_templates = Template.objects.filter(right=case.right, is_active=True)
+    has_templates = ai_templates.exists()
+    if not has_templates and not llm_settings["enabled"]:
         messages.warning(request, "No active template exists for this request type. Add one first.")
         return redirect(case)
 
-    form = ComposeForm(request.POST or None, case=case)
+    form = ComposeForm(
+        request.POST or None,
+        case=case,
+        include_ai_options=llm_settings["enabled"],
+    )
     preview = None
     action = request.POST.get("action", "")
 
     if request.method == "POST" and form.is_valid() and action in {"preview", "save"}:
         template = form.cleaned_data["template"]
         if template is None:
-            form.add_error("template", "Choose a template, or use AI assistance below.")
+            form.add_error("template", "Choose a template, or generate the letter with AI.")
         else:
             context = build_letter_context(
                 case,
@@ -196,6 +199,8 @@ def compose(request, pk):
                     scope=form.cleaned_data["scope"],
                     extra_note=form.cleaned_data["extra_note"],
                     to_address=form.cleaned_data["to_address"],
+                    subject_override=request.POST.get("subject", ""),
+                    body_override=request.POST.get("body", ""),
                     actor=request.user,
                     request=request,
                 )
@@ -207,6 +212,7 @@ def compose(request, pk):
                 "subject": subject,
                 "body": body,
                 "missing": missing,
+                "to_address": form.cleaned_data["to_address"] or case.organization.best_email,
             }
 
     return render(
@@ -219,7 +225,7 @@ def compose(request, pk):
             "profile": profile,
             "pdf_available": pdf_available(),
             "llm": llm_settings,
-            "ai_templates": ai_templates,
+            "has_templates": has_templates,
             "checklist_items": case.checklist_items,
         },
     )
@@ -279,7 +285,8 @@ def _ai_inputs(request, case: Case) -> tuple[dict | None, str]:
             "locale": locale,
             "tone": tone,
             "length": length,
-            "instructions": request.POST.get("instructions", ""),
+            "scope": request.POST.get("scope", ""),
+            "instructions": request.POST.get("instructions") or request.POST.get("extra_note", ""),
             "checklist_keys": request.POST.getlist("checklist"),
             "existing_subject": existing_subject,
             "existing_body": existing_body,
@@ -317,6 +324,7 @@ def case_ai_generate(request, pk):
             case,
             actor=request.user,
             request=request,
+            template=template,
             **inputs,
         )
     except llm.LLMError as exc:
@@ -339,6 +347,7 @@ def case_ai_generate(request, pk):
             "meta": llm_result,
             "mode": inputs["mode"],
             "template": template,
+            "to_address": request.POST.get("to_address", ""),
             "llm": assist.ai_context(case),
         },
     )
@@ -361,11 +370,14 @@ def case_ai_prompt(request, pk):
         locale=inputs["locale"],
         tone=inputs["tone"],
         length=inputs["length"],
+        scope=inputs["scope"],
         instructions=inputs["instructions"],
         checklist_keys=inputs["checklist_keys"],
         include_personal=llm.resolve_config().share_personal_data,
         existing_subject=inputs["existing_subject"],
         existing_body=inputs["existing_body"],
+        template_subject=inputs["template"].subject if inputs["template"] else "",
+        template_body=inputs["template"].body if inputs["template"] else "",
     )
     return render(
         request,
@@ -405,7 +417,7 @@ def case_ai_save(request, pk):
     except ValueError as exc:
         messages.error(request, str(exc))
         return redirect("case-compose", pk=case.pk)
-    messages.success(request, "AI-assisted draft saved. Review it before sending.")
+    messages.success(request, "AI-generated draft saved. Review it before sending.")
     return redirect("message-detail", pk=case.pk, message_pk=message.pk)
 
 

@@ -9,7 +9,7 @@
     <p class="page-subtitle">
       {{ case.organization.name }} · {{ case.right_label }} ·
       <span class="badge {% if message.status == 'draft' %}badge-warning{% elif message.status == 'sent' %}badge-info{% else %}badge-success{% endif %}">{{ message.get_status_display }}</span>
-      {% if message.ai_generated %}<span class="badge badge-info">AI-assisted</span>{% endif %}
+      {% if message.ai_generated %}<span class="badge badge-info">AI-generated</span>{% elif message.template %}<span class="badge badge-neutral">From template</span>{% endif %}
     </p>
   </div>
   <div class="actions">
@@ -54,7 +54,13 @@
         <div>
           <h2 class="card-title">Letter</h2>
           <p class="card-subtitle">
-            {% if message.template %}{{ message.template.name }} v{{ message.template_version }} · {{ message.template.get_locale_display }}{% else %}Free text{% endif %}
+            {% if message.ai_generated %}
+              AI-generated with {{ message.ai_provider }} · {{ message.ai_model }}{% if message.template %}, based on {{ message.template.name }} v{{ message.template_version }}{% endif %}
+            {% elif message.template %}
+              Filled in from {{ message.template.name }} v{{ message.template_version }} · {{ message.template.get_locale_display }}, no AI used
+            {% else %}
+              Free text
+            {% endif %}
           </p>
         </div>
       </div>
@@ -79,8 +85,12 @@
           <dt>Received</dt><dd>{{ message.received_at|date:"d M Y H:i"|default:"—" }}</dd>
           <dt>Send method</dt><dd>{{ message.get_send_method_display|default:"—" }}</dd>
           <dt>Message-ID</dt><dd class="mono tiny">{{ message.message_id|default:"—" }}</dd>
-          {% if message.ai_generated %}
-            <dt>AI model</dt><dd class="mono tiny">{{ message.ai_provider }} · {{ message.ai_model }}</dd>
+          <dt>Source</dt>
+          <dd>
+            {{ message.source_label }}{% if message.ai_generated and message.source_detail %} · <span class="mono tiny">{{ message.source_detail }}</span>{% endif %}
+          </dd>
+          {% if message.template %}
+            <dt>Template</dt><dd>{{ message.template.name }} v{{ message.template_version }}</dd>
           {% endif %}
         </dl>
         {% if message.notes %}

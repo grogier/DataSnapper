@@ -77,7 +77,7 @@
             <tr>
               <td><span class="badge {% if message.direction == 'outbound' %}badge-info{% else %}badge-success{% endif %}">{{ message.get_direction_display }}</span></td>
               <td><a class="link-quiet" href="{% url 'message-detail' case.pk message.pk %}">{{ message.subject }}</a>
-                {% if message.ai_generated %}<span class="badge badge-info">AI</span>{% endif %}
+                {% if message.ai_generated %}<span class="badge badge-info">AI-generated</span>{% elif message.template %}<span class="badge badge-neutral">From template</span>{% endif %}
                 {% if message.template %}<div class="tiny muted">{{ message.template.name }} v{{ message.template_version }}</div>{% endif %}
               </td>
               <td><span class="badge {% if message.status == 'draft' %}badge-warning{% elif message.status == 'sent' %}badge-info{% else %}badge-success{% endif %}">{{ message.get_status_display }}</span></td>

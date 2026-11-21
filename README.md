@@ -26,8 +26,10 @@ LLM requests that you explicitly enable and configure.
 - **Letter templates in English and Dutch**, versioned so a sent letter keeps
   the text it was sent with.
 - **Optional AI assistance** with a local Ollama model or a cloud
-  OpenAI-compatible/DeepSeek endpoint: describe the scope, draft a letter, or
-  rewrite a draft. Off by default.
+  OpenAI-compatible/DeepSeek endpoint: AI drafts the letter on top of a
+  template's structure and language, using the case scope and your notes. Off by
+  default; templates still work without AI. Saved drafts show whether AI
+  generated them or a template filled them.
 - **Manual-first sending:** preview, export PDF, download `.eml`, print, or copy
   the text into a web form, then mark the message sent. Marking it sent starts
   the deadline.

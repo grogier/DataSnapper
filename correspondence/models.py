@@ -111,6 +111,24 @@ class Message(TimeStampedModel):
     def is_draft(self) -> bool:
         return self.status == self.Status.DRAFT
 
+    @property
+    def source_label(self) -> str:
+        """Say plainly where the letter text came from."""
+        if self.ai_generated:
+            return "AI-generated"
+        if self.template_id:
+            return "From template"
+        return "Free text"
+
+    @property
+    def source_detail(self) -> str:
+        if self.ai_generated:
+            return " · ".join(value for value in (self.ai_provider, self.ai_model) if value)
+        if self.template_id and self.template:
+            version = f" v{self.template_version}" if self.template_version else ""
+            return f"{self.template.name}{version}"
+        return ""
+
 
 class Attachment(TimeStampedModel):
     class Kind(models.TextChoices):

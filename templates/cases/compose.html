@@ -15,75 +15,175 @@
 
 <div class="detail-grid">
   <div class="stack">
-    {% if ai_templates %}
     <div class="card">
       <div class="card-header">
         <div>
-          <h2 class="card-title">Letter details</h2>
-          <p class="card-subtitle">Pick a template, adjust the scope, then preview before saving.</p>
+          <h2 class="card-title">Write the letter</h2>
+          <p class="card-subtitle">
+            Describe what you need. AI writes the letter, using the template's structure and
+            language when one is selected. Review and save it.
+          </p>
         </div>
+        {% if llm.enabled %}
+          <div class="row">
+            <span class="badge {% if llm.is_cloud %}badge-warning{% else %}badge-success{% endif %}">
+              {{ llm.provider }}
+            </span>
+            <span class="pill mono tiny">{{ llm.model }}</span>
+          </div>
+        {% endif %}
       </div>
-      <form method="post">
+      <form method="post" action="{% url 'case-compose' case.pk %}">
         {% csrf_token %}
         <div class="card-body">
+          {% if form.non_field_errors %}
+            <div class="flash error">{{ form.non_field_errors }}</div>
+          {% endif %}
+          {% if llm.enabled and llm.key_required and not llm.key_configured %}
+            <div class="flash warning">
+              No API key is configured. Add <span class="kbd">{{ llm.key_env_name }}</span> to your
+              environment and restart. Local Ollama does not need a key.
+            </div>
+          {% endif %}
+          {% if llm.enabled and llm.is_cloud %}
+            <div class="flash warning">
+              Requests go to <span class="mono tiny">{{ llm.base_url }}</span>, outside this machine.
+              The case file itself stays local.
+            </div>
+          {% elif not llm.enabled %}
+            <div class="flash info">
+              AI is off. You can still fill the letter from a template, or enable AI in
+              <a href="{% url 'settings' %}">Settings</a>.
+            </div>
+          {% endif %}
+
           <div class="form-grid">
-            {% include "partials/form_fields.html" %}
+            {% include "partials/form_field.html" with field=form.template %}
+            {% include "partials/form_field.html" with field=form.scope %}
+            {% include "partials/form_field.html" with field=form.extra_note %}
           </div>
+
+          <details class="mt-2">
+            <summary class="label">Options</summary>
+            <div class="form-grid mt-1">
+              {% include "partials/form_field.html" with field=form.to_address %}
+              {% if form.tone %}{% include "partials/form_field.html" with field=form.tone %}{% endif %}
+              {% if form.length %}{% include "partials/form_field.html" with field=form.length %}{% endif %}
+              {% if form.reasoning %}{% include "partials/form_field.html" with field=form.reasoning %}{% endif %}
+            </div>
+
+            {% if checklist_items %}
+            <div class="mt-2">
+              <div class="label">Points to emphasise</div>
+              <div class="grid grid-2 mt-1">
+                {% for item in checklist_items %}
+                  <label class="checkbox-row">
+                    <input class="checkbox" type="checkbox" name="checklist" value="{{ item.key }}">
+                    <span class="label">{{ item.label }}</span>
+                  </label>
+                {% endfor %}
+              </div>
+              <div class="help mt-1">Used when AI writes the letter. Leave all unchecked to cover the complete checklist.</div>
+            </div>
+            {% endif %}
+          </details>
+
+          <p class="help mt-2 mb-0">
+            {% if not llm.enabled %}
+              Without AI the template is filled with your profile, the case scope and the note above.
+            {% elif llm.share_personal_data %}
+              Personal-data sharing is on: the model sees your name, address and contact details.
+            {% else %}
+              Personal-data sharing is off: the model sees the case facts, your text and
+              placeholders. Your name and contact details are filled in locally.
+            {% endif %}
+          </p>
         </div>
         <div class="card-footer form-actions">
-          <button class="btn" type="submit" name="action" value="preview">Preview</button>
-          <button class="btn btn-primary" type="submit" name="action" value="save">Save as draft</button>
+          {% if llm.enabled %}
+            <button class="btn btn-primary" type="button"
+                    hx-post="{% url 'case-ai-generate' case.pk %}"
+                    hx-include="closest form"
+                    hx-target="#letter-result"
+                    hx-swap="innerHTML show:#letter-result:top"
+                    hx-indicator="#letter-spinner">
+              Generate letter
+            </button>
+          {% endif %}
+          {% if has_templates %}
+            <button class="btn {% if not llm.enabled %}btn-primary{% endif %}" type="submit"
+                    name="action" value="preview">
+              Fill from template (no AI)
+            </button>
+          {% endif %}
           <a class="btn btn-ghost" href="{{ case.get_absolute_url }}">Cancel</a>
+          <span id="letter-spinner" class="htmx-indicator small muted row">
+            <span class="spinner"></span> Generating with AI…
+          </span>
         </div>
       </form>
     </div>
-    {% else %}
-    <div class="card">
-      <div class="card-body">
-        <div class="flash info mb-0">
-          No active template exists for this request type. Use AI assistance below, or add a
-          template first.
-        </div>
-      </div>
-    </div>
-    {% endif %}
 
-    {% include "correspondence/_ai_panel.html" %}
-
-    {% if preview %}
-    <div class="card">
-      <div class="card-header">
-        <div>
-          <h2 class="card-title">Preview</h2>
-          <p class="card-subtitle">{{ preview.template.name }} · {{ preview.template.locale|upper }} v{{ preview.template.version }}</p>
-        </div>
-        <span class="badge badge-info">{{ preview.template.legal_refs }}</span>
-      </div>
-      <div class="card-body">
-        {% if preview.missing %}
-          <div class="flash warning">
-            These variables are not available and will render empty:
-            <strong>{{ preview.missing|join:", " }}</strong>
+    <div id="letter-result">
+      {% if preview %}
+      <div class="card">
+        <div class="card-header">
+          <div>
+            <h2 class="card-title">Template draft</h2>
+            <p class="card-subtitle">
+              {{ preview.template.name }} · {{ preview.template.locale|upper }} v{{ preview.template.version }} ·
+              filled in locally, no AI used
+            </p>
           </div>
-        {% endif %}
-        <div class="small muted mb-1">Subject</div>
-        <div class="mb-2"><strong>{{ preview.subject }}</strong></div>
-        <div class="letter-preview">{{ preview.body }}</div>
+          <div class="row">
+            <span class="badge badge-neutral">From template</span>
+            <span class="badge badge-info">{{ preview.template.legal_refs }}</span>
+          </div>
+        </div>
+        <div class="card-body">
+          {% if preview.missing %}
+            <div class="flash warning">
+              These variables are not available and will render empty:
+              <strong>{{ preview.missing|join:", " }}</strong>
+            </div>
+          {% endif %}
+          <form method="post" action="{% url 'case-compose' case.pk %}">
+            {% csrf_token %}
+            <input type="hidden" name="action" value="save">
+            <input type="hidden" name="template" value="{{ preview.template.pk }}">
+            <div class="field">
+              <label class="label" for="preview-subject">Subject</label>
+              <input class="input" id="preview-subject" name="subject" maxlength="255" value="{{ preview.subject }}">
+            </div>
+            <div class="field mt-2">
+              <label class="label" for="preview-body">Letter</label>
+              <textarea class="textarea" id="preview-body" name="body" rows="20">{{ preview.body }}</textarea>
+            </div>
+            <div class="field mt-2">
+              <label class="label" for="preview-to">Send to</label>
+              <input class="input" id="preview-to" name="to_address" value="{{ preview.to_address }}">
+            </div>
+            <div class="form-actions">
+              <button class="btn btn-primary" type="submit">Save as draft</button>
+              <span class="help">You can edit the text before saving.</span>
+            </div>
+          </form>
+        </div>
+        <div class="card-footer">
+          Saves without AI. Use <strong>Generate letter</strong> above to have AI polish it first.
+        </div>
       </div>
-      <div class="card-footer">
-        Save the draft to export a PDF, .eml file or copy-paste text for a web form.
-      </div>
+      {% endif %}
     </div>
-    {% endif %}
   </div>
 
   <div class="stack">
     <div class="card">
-      <div class="card-header"><h2 class="card-title">Guidance</h2></div>
+      <div class="card-header"><h2 class="card-title">How this works</h2></div>
       <div class="card-body small">
-        <p class="mt-0">The template uses your profile from <a href="{% url 'settings' %}">Settings</a> and the recipient from the company record.</p>
+        <p class="mt-0">The template supplies the structure, language and legal references. AI adapts it to your scope, note and selected points; without AI the template is filled in as-is.</p>
         <p>Scope is what makes a request precise. Mention accounts, email addresses, services and the period you care about.</p>
-        <p class="mb-0">Drafts are stored with the rendered text. Later template edits do not change this letter.</p>
+        <p class="mb-0">Drafts are stored with the final text. Later template edits do not change this letter.</p>
       </div>
     </div>
 

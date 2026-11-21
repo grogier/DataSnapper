@@ -1,54 +1,87 @@
 {% if error %}
   <div class="flash error">{{ error }}</div>
-{% else %}
-  <div class="row mb-2">
-    <span class="badge badge-info">AI-assisted</span>
-    <span class="pill">{{ meta.provider }} · {{ meta.model }}</span>
-    <span class="pill">{{ meta.duration_ms }} ms</span>
-    {% if meta.prompt_tokens %}
-      <span class="pill">{{ meta.prompt_tokens }} in / {{ meta.completion_tokens }} out</span>
-    {% endif %}
-    {% if meta.cached_tokens %}<span class="pill">{{ meta.cached_tokens }} cached</span>{% endif %}
-  </div>
-  <div class="flash warning">
-    Review this text before sending. A model can be wrong, and this is not legal advice.
-  </div>
   <p class="help">
-    Placeholders such as <span class="kbd">profile.full_name</span> are filled in from your
-    profile when you save the draft. You can edit the text first.
+    Check the <a href="{% url 'settings' %}">AI settings</a>, or try again. Nothing was saved.
   </p>
+{% else %}
+  <div class="card">
+    <div class="card-header">
+      <div>
+        <h2 class="card-title">AI-generated draft</h2>
+        <p class="card-subtitle">
+          {% if mode == "scope" %}
+            Review the description, then use it as the case scope.
+          {% elif template %}
+            Based on the {{ template.name }} template ({{ template.locale|upper }} v{{ template.version }}).
+          {% else %}
+            Drafted from scratch, without a template.
+          {% endif %}
+        </p>
+      </div>
+      <span class="badge badge-info">AI-generated</span>
+    </div>
+    <div class="card-body">
+      {% if mode == "scope" %}
+        <div class="flash success">
+          AI responded in {{ meta.duration_ms }} ms using {{ meta.provider }} · {{ meta.model }}.
+        </div>
+      {% else %}
+        <div class="flash success">
+          AI wrote this letter in {{ meta.duration_ms }} ms using {{ meta.provider }} · {{ meta.model }}.
+          Review and edit it below.
+        </div>
+      {% endif %}
+      <div class="row mb-2">
+        <span class="pill">{{ meta.prompt_tokens|default:"—" }} in / {{ meta.completion_tokens|default:"—" }} out</span>
+        {% if meta.cached_tokens %}<span class="pill">{{ meta.cached_tokens }} cached</span>{% endif %}
+        {% if template %}
+          <span class="pill">Template: {{ template.name }} v{{ template.version }}</span>
+        {% else %}
+          <span class="pill">No template</span>
+        {% endif %}
+      </div>
+      <div class="flash warning">
+        Review this text before sending. A model can be wrong, and this is not legal advice.
+      </div>
+      <p class="help">
+        Placeholders such as <span class="kbd">profile.full_name</span> are filled in from your
+        profile when you save the draft. Change the options above and generate again to replace
+        this draft.
+      </p>
 
-  {% if mode == "scope" %}
-    <form method="post" action="{% url 'case-ai-apply-scope' case.pk %}">
-      {% csrf_token %}
-      <div class="field">
-        <label class="label" for="ai-scope">Scope</label>
-        <textarea class="textarea" id="ai-scope" name="scope" rows="12">{{ result.scope }}</textarea>
-        <div class="help">This replaces the scope on the case when you save it.</div>
-      </div>
-      <div class="form-actions">
-        <button class="btn btn-primary" type="submit">Use this scope</button>
-      </div>
-    </form>
-  {% else %}
-    <form method="post" action="{% url 'case-ai-save' case.pk %}">
-      {% csrf_token %}
-      {% if template %}<input type="hidden" name="template" value="{{ template.pk }}">{% endif %}
-      <div class="field">
-        <label class="label" for="ai-subject">Subject</label>
-        <input class="input" id="ai-subject" name="subject" maxlength="255" value="{{ result.subject }}">
-      </div>
-      <div class="field mt-2">
-        <label class="label" for="ai-body">Letter</label>
-        <textarea class="textarea" id="ai-body" name="body" rows="20">{{ result.body }}</textarea>
-      </div>
-      <div class="field mt-2">
-        <label class="label" for="ai-to">Send to</label>
-        <input class="input" id="ai-to" name="to_address" value="{{ case.organization.best_email }}">
-      </div>
-      <div class="form-actions">
-        <button class="btn btn-primary" type="submit">Save as draft</button>
-      </div>
-    </form>
-  {% endif %}
+      {% if mode == "scope" %}
+        <form method="post" action="{% url 'case-ai-apply-scope' case.pk %}">
+          {% csrf_token %}
+          <div class="field">
+            <label class="label" for="ai-scope">Scope</label>
+            <textarea class="textarea" id="ai-scope" name="scope" rows="12">{{ result.scope }}</textarea>
+            <div class="help">This replaces the scope on the case when you save it.</div>
+          </div>
+          <div class="form-actions">
+            <button class="btn btn-primary" type="submit">Use this scope</button>
+          </div>
+        </form>
+      {% else %}
+        <form method="post" action="{% url 'case-ai-save' case.pk %}">
+          {% csrf_token %}
+          {% if template %}<input type="hidden" name="template" value="{{ template.pk }}">{% endif %}
+          <div class="field">
+            <label class="label" for="ai-subject">Subject</label>
+            <input class="input" id="ai-subject" name="subject" maxlength="255" value="{{ result.subject }}">
+          </div>
+          <div class="field mt-2">
+            <label class="label" for="ai-body">Letter</label>
+            <textarea class="textarea" id="ai-body" name="body" rows="20">{{ result.body }}</textarea>
+          </div>
+          <div class="field mt-2">
+            <label class="label" for="ai-to">Send to</label>
+            <input class="input" id="ai-to" name="to_address" value="{{ to_address|default:case.organization.best_email }}">
+          </div>
+          <div class="form-actions">
+            <button class="btn btn-primary" type="submit">Save as draft</button>
+          </div>
+        </form>
+      {% endif %}
+    </div>
+  </div>
 {% endif %}

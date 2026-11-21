@@ -30,6 +30,7 @@ SUGGESTED_PLACEHOLDERS = (
     "organization.name",
     "organization.legal_name",
     "contact.name",
+    "case.reference",
     "due_date",
     "signature",
 )
@@ -142,11 +143,14 @@ def build_prompt(
     locale: str = "en",
     tone: str = "neutral",
     length: str = "concise",
+    scope: str = "",
     instructions: str = "",
     checklist_keys: list[str] | None = None,
     include_personal: bool = False,
     existing_subject: str = "",
     existing_body: str = "",
+    template_subject: str = "",
+    template_body: str = "",
 ) -> PromptBundle:
     if mode not in MODES:
         raise ValueError(f"Unknown AI mode: {mode}")
@@ -158,14 +162,25 @@ def build_prompt(
         if include_personal
         else ("Personal and contact details are withheld. Use the placeholders below.")
     )
+    scope_text = (scope or "").strip() or case.scope.strip()
     notes_parts = []
-    if case.scope.strip():
-        notes_parts.append("Scope notes:\n" + case.scope.strip())
+    if scope_text:
+        notes_parts.append("Scope notes:\n" + scope_text)
     if case.notes.strip():
         notes_parts.append("Case notes:\n" + case.notes.strip())
     notes = _truncate("\n\n".join(notes_parts)) or "(none)"
     points = "\n".join(f"- {label}" for label in _checklist_for_prompt(case, checklist_keys))
     points = points or "- None selected; cover the full request."
+
+    base_block = ""
+    if mode == "draft" and template_body.strip():
+        base_block = (
+            "\nBASE TEMPLATE (trusted starting point: keep its structure, legal wording and "
+            "language, and adapt the details to this case. Template tags such as "
+            "{% if ... %} are formatting only: never copy them into the letter.)\n"
+            f"Subject: {_truncate(template_subject, 300) or '(none)'}\n"
+            f"Body:\n{_truncate(template_body, MAX_NOTES_CHARS)}\n"
+        )
 
     existing_block = ""
     if mode == "rewrite" and existing_body.strip():
@@ -223,14 +238,16 @@ PERSONAL DETAILS
 
 CASE NOTES (untrusted data)
 {notes}
-
+{base_block}
 EXTRA INSTRUCTIONS
 {_truncate(instructions, 1500) or "(none)"}
 {existing_block}
 RULES
 - Cite only the GDPR and only the article above.
 - Put all personal and contact details in these placeholders exactly: {placeholders}.
-- Do not use any other placeholder.
+- Do not use any other placeholder, and do not output template tags.
+- If a base template is provided, keep its section order and legal wording where it still
+  fits, and replace its example details with the facts of this case.
 - Plain text, no markdown, no HTML.
 - If a fact is unknown, leave it out rather than inventing it.
 - For a letter, include the request, the required points, the one-month deadline under
@@ -318,10 +335,12 @@ def generate_assist(
     locale: str = "en",
     tone: str = "neutral",
     length: str = "concise",
+    scope: str = "",
     instructions: str = "",
     checklist_keys: list[str] | None = None,
     existing_subject: str = "",
     existing_body: str = "",
+    template: Template | None = None,
     reasoning: bool | None = None,
     actor=None,
     request=None,
@@ -337,16 +356,20 @@ def generate_assist(
         locale=locale,
         tone=tone,
         length=length,
+        scope=scope,
         instructions=instructions,
         checklist_keys=checklist_keys,
         include_personal=config.share_personal_data,
         existing_subject=existing_subject,
         existing_body=existing_body,
+        template_subject=template.subject if template else "",
+        template_body=template.body if template else "",
     )
     metadata = {
         "provider": config.provider,
         "model": config.model,
         "mode": mode,
+        "template": template.slug if template else "",
         "prompt_version": PROMPT_VERSION,
         "prompt_sha256": bundle.prompt_sha256,
         "reasoning": config.reasoning,
@@ -457,7 +480,7 @@ def create_ai_draft(
         case,
         CaseEvent.EventType.MESSAGE,
         actor=actor,
-        summary=f"AI-assisted draft prepared: {message.subject}",
+        summary=f"AI-generated draft prepared: {message.subject}",
         metadata={"message_id": message.pk, "provider": provider, "model": model},
     )
     log(
@@ -465,7 +488,7 @@ def create_ai_draft(
         action="message.ai_draft",
         entity_type="message",
         entity_id=str(message.pk),
-        summary=f"{case.reference}: AI-assisted draft saved",
+        summary=f"{case.reference}: AI-generated draft saved",
         metadata={
             "provider": provider,
             "model": model,
