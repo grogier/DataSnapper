@@ -48,13 +48,16 @@ the portal.
 Requirements: Docker with Compose v2.
 
 ```bash
-docker compose up -d --build
+docker compose pull
+docker compose up -d
 ```
 
-That works without any configuration file. The compose file passes local
-defaults (`DEBUG=0`, `ADMIN_USERNAME=admin`, `ALLOWED_HOSTS` for localhost) and
-generates the secret keys in `./data` on first start. If `ADMIN_PASSWORD` is not
-set, a password is generated and printed once:
+This uses the prebuilt image from
+`ghcr.io/grogier/datasnapper:latest`; nothing is compiled locally. It works
+without any configuration file. The compose file passes local defaults
+(`DEBUG=0`, `ADMIN_USERNAME=admin`, `ALLOWED_HOSTS` for localhost) and generates
+the secret keys in `./data` on first start. If `ADMIN_PASSWORD` is not set, a
+password is generated and printed once:
 
 ```bash
 docker compose logs app | grep -A2 "Generated password"
@@ -65,7 +68,7 @@ To choose settings up front, either export variables or create a `.env`. A
 
 ```bash
 ADMIN_PASSWORD='a-long-password' ALLOWED_HOSTS=localhost,192.168.1.20 \
-  docker compose up -d --build
+  docker compose up -d
 
 # or: cp .env.example .env  and edit it
 ```
@@ -76,7 +79,7 @@ migrations, creates the admin user, seeds the 20 letter templates, and then
 starts Gunicorn.
 
 The compose file bind-mounts `./data` to `/data` inside the container, so the
-database, media and backups survive container rebuilds. Keep that directory on
+database, media and backups survive container upgrades. Keep that directory on
 an encrypted disk if possible.
 
 Useful commands:
@@ -86,6 +89,16 @@ docker compose logs -f app
 docker compose down
 docker compose exec app python manage.py backup
 docker compose exec app python manage.py verify_audit
+
+# update to the newest published image
+docker compose pull && docker compose up -d
+```
+
+`latest` follows the default branch. To stay on a specific build, pin the tag
+(branch name, git tag, or `sha-<commit>`) in `.env` or on the command line:
+
+```bash
+DATASNAPPER_TAG=main docker compose pull && docker compose up -d
 ```
 
 For HTTPS, put the app behind a reverse proxy. `docker/Caddyfile.example` is a

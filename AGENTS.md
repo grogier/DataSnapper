@@ -135,12 +135,19 @@ as the `app` user. `/data` is the persistent volume; Compose maps
 defaults via `${VAR:-default}`, so it runs without a `.env` file; a `.env` or
 exported variables override those defaults.
 
+Compose runs the prebuilt image `ghcr.io/grogier/datasnapper:latest` (override
+with `DATASNAPPER_TAG`) and has no `build:` section, so deployments never
+compile locally. Keep it that way; the image is built and published by CI only.
+The Dockerfile must stay self-sufficient for that CI build, including file
+modes: `entrypoint.sh` is `chmod +x`'d in the image because deploy tools and
+Windows checkouts can drop the executable bit.
+
 Workflows:
 
 - `.github/workflows/ci.yml` — ruff and pytest.
 - `.github/workflows/docker-publish.yml` — builds on code-changing pushes and
-  publishes `ghcr.io/grogier/datasnapper` with branch/tag/sha tags plus
-  `latest` on the default branch.
+  publishes `ghcr.io/grogier/datasnapper` for `linux/amd64` and `linux/arm64`
+  with branch/tag/sha tags plus `latest` on the default branch.
 
 ## Recipes
 

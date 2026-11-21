@@ -1,18 +1,25 @@
-# DataSnapper runs with sensible local defaults: `docker compose up -d --build`
-# works without a .env file. Every value below can be overridden from the shell,
-# for example:
+# DataSnapper runs from the prebuilt image published to GHCR, so no local build
+# is needed: `docker compose pull && docker compose up -d` works without a .env
+# file. Use `docker compose pull` to pick up new releases.
+#
+# Every value below can be overridden from the shell, for example:
 #
 #   ADMIN_PASSWORD='a-long-password' docker compose up -d
 #
 # A .env file in this directory is still picked up automatically when present,
 # and has the same effect as exporting the variables. See .env.example.
+#
+# To run a specific release, pin the tag (branch, git tag or sha-<commit>):
+#
+#   DATASNAPPER_TAG=sha-1a2b3c4 docker compose up -d
+#
+# Contributors can still build locally with
+#   docker build -f docker/Dockerfile -t ghcr.io/grogier/datasnapper:latest .
 
 services:
   app:
-    build:
-      context: .
-      dockerfile: docker/Dockerfile
-    image: datasnapper:latest
+    # Images are published by .github/workflows/docker-publish.yml.
+    image: ghcr.io/grogier/datasnapper:${DATASNAPPER_TAG:-latest}
     environment:
       # Storage inside the container. The volume below keeps it on the host.
       DATA_DIR: /data

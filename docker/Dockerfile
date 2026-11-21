@@ -23,6 +23,10 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 COPY . .
 
+# Do not rely on the exec bit surviving the build context: some deploy tools
+# (and Windows checkouts) copy files without file modes.
+RUN chmod +x /app/docker/entrypoint.sh
+
 # Build-only key so collectstatic does not create a runtime secret in the image.
 RUN SECRET_KEY=build-only DATA_DIR=/tmp/build-data python manage.py collectstatic --noinput
 
