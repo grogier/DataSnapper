@@ -133,7 +133,9 @@ The entrypoint runs migrations, `ensure_admin`, `seed_templates`, then Gunicorn
 as the `app` user. `/data` is the persistent volume; Compose maps
 `8080:8000` and health-checks `/healthz`. `docker-compose.yml` supplies local
 defaults via `${VAR:-default}`, so it runs without a `.env` file; a `.env` or
-exported variables override those defaults.
+exported variables override those defaults. `ALLOWED_HOSTS` defaults to `*`
+there so the portal works from a LAN IP or hostname without extra setup; the
+README tells users to narrow it before exposing it beyond their network.
 
 Compose runs the prebuilt image `ghcr.io/grogier/datasnapper:latest` (override
 with `DATASNAPPER_TAG`) and has no `build:` section, so deployments never

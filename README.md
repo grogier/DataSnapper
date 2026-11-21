@@ -55,7 +55,7 @@ docker compose up -d
 This uses the prebuilt image from
 `ghcr.io/grogier/datasnapper:latest`; nothing is compiled locally. It works
 without any configuration file. The compose file passes local defaults
-(`DEBUG=0`, `ADMIN_USERNAME=admin`, `ALLOWED_HOSTS` for localhost) and generates
+(`DEBUG=0`, `ADMIN_USERNAME=admin`, permissive `ALLOWED_HOSTS`) and generates
 the secret keys in `./data` on first start. If `ADMIN_PASSWORD` is not set, a
 password is generated and printed once:
 
@@ -74,9 +74,14 @@ ADMIN_PASSWORD='a-long-password' ALLOWED_HOSTS=localhost,192.168.1.20 \
 ```
 
 Open <http://localhost:8080> and sign in with `ADMIN_USERNAME` (default
-`admin`) and your `ADMIN_PASSWORD`. On the first start the container runs
-migrations, creates the admin user, seeds the 20 letter templates, and then
-starts Gunicorn.
+`admin`) and your `ADMIN_PASSWORD`. From another device on your network, use
+`http://<host-ip>:8080`. Compose sets `ALLOWED_HOSTS=*`, so LAN addresses work
+without configuration; set an explicit list (for example
+`ALLOWED_HOSTS=localhost,127.0.0.1,10.0.20.12`) before exposing the portal
+outside your own network.
+
+On the first start the container runs migrations, creates the admin user, seeds
+the 20 letter templates, and then starts Gunicorn.
 
 The compose file bind-mounts `./data` to `/data` inside the container, so the
 database, media and backups survive container upgrades. Keep that directory on
@@ -142,7 +147,7 @@ Compose. See `.env.example` for the full list.
 | Variable | Default | Purpose |
 | --- | --- | --- |
 | `DEBUG` | `1` locally, `0` in Docker | Debug mode. Keep `0` in production. |
-| `ALLOWED_HOSTS` | `localhost,127.0.0.1` locally, adds `datasnapper.local` in Docker | Comma-separated hostnames. |
+| `ALLOWED_HOSTS` | `*` in Docker, `localhost,127.0.0.1` locally | Comma-separated hostnames. Narrow it when exposing the portal. |
 | `CSRF_TRUSTED_ORIGINS` | empty | Required for HTTPS origins, e.g. `https://cases.example.com`. |
 | `DATA_DIR` | `./data` locally, `/data` in Docker | Database, media, backups and generated keys. |
 | `DATABASE_PATH` | `$DATA_DIR/db/datasnapper.sqlite3` | Override the SQLite file. |

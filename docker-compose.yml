@@ -25,7 +25,11 @@ services:
       DATA_DIR: /data
 
       DEBUG: ${DEBUG:-0}
-      ALLOWED_HOSTS: ${ALLOWED_HOSTS:-localhost,127.0.0.1,datasnapper.local}
+      # Accept any host by default so the portal works from a LAN IP, a
+      # hostname, or behind a proxy without extra configuration. Set an
+      # explicit list (localhost,127.0.0.1,10.0.20.12) before exposing it
+      # beyond your own network.
+      ALLOWED_HOSTS: ${ALLOWED_HOSTS:-*}
       CSRF_TRUSTED_ORIGINS: ${CSRF_TRUSTED_ORIGINS:-}
 
       # Leave empty to generate and persist keys in /data on first start.
