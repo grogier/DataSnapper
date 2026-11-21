@@ -1,0 +1,101 @@
+{% load static %}
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}{{ app_name }}{% endblock %}</title>
+  <link rel="stylesheet" href="{% static 'css/app.css' %}">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='22' fill='%231d4ed8'/><text x='50' y='68' font-size='52' font-family='Arial' font-weight='bold' fill='white' text-anchor='middle'>D</text></svg>">
+  {% block extra_head %}{% endblock %}
+</head>
+<body hx-headers='{"X-CSRFToken": "{{ csrf_token }}"}'>
+  <aside class="sidebar">
+    <a class="brand" href="{% url 'dashboard' %}">
+      <span class="brand-mark">D</span>
+      <span>
+        <span class="brand-name">{{ app_name }}</span>
+        <span class="brand-sub">{{ app_tagline }}</span>
+      </span>
+    </a>
+
+    {% with url_name=request.resolver_match.url_name %}
+    <nav class="nav">
+      <a class="nav-link {% if url_name == 'dashboard' %}active{% endif %}" href="{% url 'dashboard' %}">
+        <span class="nav-dot"></span> Dashboard
+      </a>
+
+      <div class="nav-section">Case work</div>
+      <a class="nav-link {% if url_name == 'case-list' or url_name == 'case-create' or url_name == 'case-detail' or url_name == 'case-update' or url_name == 'case-compose' or url_name == 'case-reply' or url_name == 'message-detail' or url_name == 'message-print' %}active{% endif %}" href="{% url 'case-list' %}">
+        <span class="nav-dot"></span> Cases
+        {% if nav_open_cases %}<span class="nav-count">{{ nav_open_cases }}</span>{% endif %}
+      </a>
+      <a class="nav-link {% if url_name == 'organization-list' or url_name == 'organization-detail' or url_name == 'organization-create' or url_name == 'organization-update' or url_name == 'contact-create' or url_name == 'contact-update' or url_name == 'inventory-create' %}active{% endif %}" href="{% url 'organization-list' %}">
+        <span class="nav-dot"></span> Companies
+      </a>
+      <a class="nav-link {% if url_name == 'template-list' or url_name == 'template-detail' or url_name == 'template-create' or url_name == 'template-edit' %}active{% endif %}" href="{% url 'template-list' %}">
+        <span class="nav-dot"></span> Templates
+      </a>
+      <a class="nav-link {% if url_name == 'evidence-list' or url_name == 'evidence-upload' %}active{% endif %}" href="{% url 'evidence-list' %}">
+        <span class="nav-dot"></span> Evidence
+      </a>
+
+      <div class="nav-section">Planning</div>
+      <a class="nav-link {% if url_name == 'calendar' %}active{% endif %}" href="{% url 'calendar' %}">
+        <span class="nav-dot"></span> Calendar
+        {% if nav_overdue %}<span class="nav-count danger">{{ nav_overdue }}</span>{% elif nav_due_soon %}<span class="nav-count warning">{{ nav_due_soon }}</span>{% endif %}
+      </a>
+      <a class="nav-link {% if url_name == 'audit-list' %}active{% endif %}" href="{% url 'audit-list' %}">
+        <span class="nav-dot"></span> Audit log
+      </a>
+
+      <div class="nav-section">System</div>
+      <a class="nav-link {% if url_name == 'settings' %}active{% endif %}" href="{% url 'settings' %}">
+        <span class="nav-dot"></span> Settings
+      </a>
+      <a class="nav-link" href="/admin/">
+        <span class="nav-dot"></span> Admin
+      </a>
+    </nav>
+    {% endwith %}
+
+    <div class="sidebar-footer">
+      {{ app_name }} v{{ app_version }}<br>
+      Local-first. Your case file stays here.
+    </div>
+  </aside>
+
+  <div class="main">
+    <header class="topbar">
+      <form class="search" method="get" action="{% url 'search' %}" role="search">
+        <input class="input" type="search" name="q" placeholder="Search cases, companies, messages…" value="{{ request.GET.q|default:'' }}" aria-label="Search">
+        <button class="btn" type="submit">Search</button>
+      </form>
+      <div class="topbar-actions">
+        <a class="btn btn-sm btn-ghost" href="{% url 'calendar' %}">Calendar</a>
+        <span class="user-chip">
+          <span class="user-avatar">{{ request.user.username|first|upper }}</span>
+          {{ request.user.username }}
+        </span>
+        <form method="post" action="{% url 'logout' %}">
+          {% csrf_token %}
+          <button class="btn btn-sm" type="submit">Sign out</button>
+        </form>
+      </div>
+    </header>
+
+    <main class="content">
+      {% if messages %}
+        {% for message in messages %}
+          <div class="flash {{ message.tags }}">{{ message }}</div>
+        {% endfor %}
+      {% endif %}
+      {% block content %}{% endblock %}
+    </main>
+  </div>
+
+  <script src="{% static 'vendor/htmx.min.js' %}" defer></script>
+  <script src="{% static 'js/app.js' %}" defer></script>
+  {% block extra_js %}{% endblock %}
+</body>
+</html>

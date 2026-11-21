@@ -1,0 +1,41 @@
+services:
+  app:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile
+    image: datasnapper:latest
+    env_file:
+      - .env
+    environment:
+      DATA_DIR: /data
+    volumes:
+      - ./data:/data
+    ports:
+      - "8080:8000"
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:8000/healthz"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 25s
+
+  # Optional HTTPS reverse proxy. Enable with:
+  #   docker compose --profile tls up -d
+  # and edit docker/Caddyfile.example.
+  # caddy:
+  #   image: caddy:2
+  #   profiles: ["tls"]
+  #   depends_on: [app]
+  #   volumes:
+  #     - ./docker/Caddyfile.example:/etc/caddy/Caddyfile:ro
+  #     - caddy_data:/data
+  #     - caddy_config:/config
+  #   ports:
+  #     - "80:80"
+  #     - "443:443"
+  #   restart: unless-stopped
+  #
+  # volumes:
+  #   caddy_data:
+  #   caddy_config:

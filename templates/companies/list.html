@@ -1,0 +1,79 @@
+{% extends "base.html" %}
+{% load ds_tags %}
+{% block title %}Companies · {{ app_name }}{% endblock %}
+{% block content %}
+<div class="page-header">
+  <div>
+    <h1 class="page-title">Companies</h1>
+    <p class="page-subtitle">{{ total }} organisation{{ total|pluralize }} in your case file.</p>
+  </div>
+  <div class="actions">
+    <a class="btn btn-primary" href="{% url 'organization-create' %}">New company</a>
+  </div>
+</div>
+
+<div class="card">
+  <div class="card-body tight">
+    <form method="get" class="row" style="gap:8px;">
+      <input class="input" style="max-width:320px;" type="search" name="q" value="{{ query }}" placeholder="Search name or privacy email">
+      <select class="select" name="category" style="max-width:180px;">
+        <option value="">All categories</option>
+        {% for value, label in categories %}
+          <option value="{{ value }}" {% if category == value %}selected{% endif %}>{{ label }}</option>
+        {% endfor %}
+      </select>
+      <select class="select" name="status" style="max-width:180px;">
+        <option value="">All statuses</option>
+        {% for value, label in statuses %}
+          <option value="{{ value }}" {% if status == value %}selected{% endif %}>{{ label }}</option>
+        {% endfor %}
+      </select>
+      <button class="btn" type="submit">Filter</button>
+      {% if query or category or status %}
+        <a class="btn btn-ghost" href="{% url 'organization-list' %}">Clear</a>
+      {% endif %}
+    </form>
+  </div>
+
+  {% if organizations %}
+  <div class="table-wrap">
+    <table class="table">
+      <thead>
+        <tr>
+          <th>Company</th>
+          <th>Category</th>
+          <th>Privacy contact</th>
+          <th>Cases</th>
+          <th>Status</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>
+      {% for organization in organizations %}
+        <tr>
+          <td>
+            <a class="link-quiet" href="{{ organization.get_absolute_url }}"><strong>{{ organization.name }}</strong></a>
+            {% if organization.legal_name and organization.legal_name != organization.name %}
+              <div class="tiny muted">{{ organization.legal_name }}</div>
+            {% endif %}
+          </td>
+          <td class="small">{{ organization.get_category_display }}</td>
+          <td class="small">{{ organization.best_email|default:"—" }}</td>
+          <td>{{ organization.case_count }}</td>
+          <td><span class="badge {% if organization.status == 'active' %}badge-success{% elif organization.status == 'erased' %}badge-info{% elif organization.status == 'blocked' %}badge-danger{% else %}badge-neutral{% endif %}">{{ organization.get_status_display }}</span></td>
+          <td class="actions-cell"><a class="btn btn-sm" href="{{ organization.get_absolute_url }}">Open</a></td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+    <div class="empty">
+      <h3>No companies yet</h3>
+      <p>Add the first organisation that collects your data, then create a request.</p>
+      <a class="btn btn-primary" href="{% url 'organization-create' %}">Add company</a>
+    </div>
+  {% endif %}
+  {% include "partials/pagination.html" %}
+</div>
+{% endblock %}

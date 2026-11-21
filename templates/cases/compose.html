@@ -1,0 +1,101 @@
+{% extends "base.html" %}
+{% load ds_tags %}
+{% block title %}Compose · {{ case.reference }} · {{ app_name }}{% endblock %}
+{% block content %}
+<div class="breadcrumb"><a href="{% url 'case-list' %}">Cases</a> / <a href="{{ case.get_absolute_url }}">{{ case.reference }}</a> / Compose</div>
+<div class="page-header">
+  <div>
+    <h1 class="page-title">Compose letter</h1>
+    <p class="page-subtitle">{{ case.organization.name }} · {{ case.right_label }} · {{ case.reference }}</p>
+  </div>
+  <div class="actions">
+    <a class="btn" href="{{ case.get_absolute_url }}">Back to case</a>
+  </div>
+</div>
+
+<div class="detail-grid">
+  <div class="stack">
+    <div class="card">
+      <div class="card-header">
+        <div>
+          <h2 class="card-title">Letter details</h2>
+          <p class="card-subtitle">Pick a template, adjust the scope, then preview before saving.</p>
+        </div>
+      </div>
+      <form method="post">
+        {% csrf_token %}
+        <div class="card-body">
+          <div class="form-grid">
+            {% include "partials/form_fields.html" %}
+          </div>
+        </div>
+        <div class="card-footer form-actions">
+          <button class="btn" type="submit" name="action" value="preview">Preview</button>
+          <button class="btn btn-primary" type="submit" name="action" value="save">Save as draft</button>
+          <a class="btn btn-ghost" href="{{ case.get_absolute_url }}">Cancel</a>
+        </div>
+      </form>
+    </div>
+
+    {% if preview %}
+    <div class="card">
+      <div class="card-header">
+        <div>
+          <h2 class="card-title">Preview</h2>
+          <p class="card-subtitle">{{ preview.template.name }} · {{ preview.template.locale|upper }} v{{ preview.template.version }}</p>
+        </div>
+        <span class="badge badge-info">{{ preview.template.legal_refs }}</span>
+      </div>
+      <div class="card-body">
+        {% if preview.missing %}
+          <div class="flash warning">
+            These variables are not available and will render empty:
+            <strong>{{ preview.missing|join:", " }}</strong>
+          </div>
+        {% endif %}
+        <div class="small muted mb-1">Subject</div>
+        <div class="mb-2"><strong>{{ preview.subject }}</strong></div>
+        <div class="letter-preview">{{ preview.body }}</div>
+      </div>
+      <div class="card-footer">
+        Save the draft to export a PDF, .eml file or copy-paste text for a web form.
+      </div>
+    </div>
+    {% endif %}
+  </div>
+
+  <div class="stack">
+    <div class="card">
+      <div class="card-header"><h2 class="card-title">Guidance</h2></div>
+      <div class="card-body small">
+        <p class="mt-0">The template uses your profile from <a href="{% url 'settings' %}">Settings</a> and the recipient from the company record.</p>
+        <p>Scope is what makes a request precise. Mention accounts, email addresses, services and the period you care about.</p>
+        <p class="mb-0">Drafts are stored with the rendered text. Later template edits do not change this letter.</p>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-header"><h2 class="card-title">Case facts</h2></div>
+      <div class="card-body">
+        <dl class="meta-list">
+          <dt>Reference</dt><dd>{{ case.reference }}</dd>
+          <dt>Company</dt><dd>{{ case.organization.name }}</dd>
+          <dt>Recipient</dt><dd>{{ case.organization.best_email|default:"—" }}</dd>
+          <dt>Deadline</dt><dd>{% if case.effective_due %}{{ case.effective_due|date:"d M Y" }}{% else %}Not started{% endif %}</dd>
+          <dt>Scope</dt><dd>{{ case.scope|default:"All personal data" }}</dd>
+        </dl>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-header"><h2 class="card-title">Your profile</h2></div>
+      <div class="card-body small">
+        <strong>{{ profile.full_name }}</strong><br>
+        {{ profile.email|default:"No email set" }}<br>
+        {{ profile.postal_address|linebreaksbr|default:"No postal address set" }}
+        <div class="mt-2"><a class="btn btn-sm" href="{% url 'settings' %}">Edit profile</a></div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

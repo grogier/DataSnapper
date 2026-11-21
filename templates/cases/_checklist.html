@@ -1,0 +1,25 @@
+<div id="checklist-panel">
+  <div class="spread mb-1">
+    <span class="progress-label">{{ case.checklist_done }} of {{ case.checklist_total }} complete</span>
+    <span class="progress-label">{{ case.checklist_percent }}%</span>
+  </div>
+  <div class="progress mb-2"><span style="width: {{ case.checklist_percent }}%"></span></div>
+  <div class="checklist">
+    {% for item in checklist_items %}
+      <form method="post"
+            action="{% url 'checklist-toggle' case.pk %}"
+            hx-post="{% url 'checklist-toggle' case.pk %}"
+            hx-target="#checklist-panel"
+            hx-swap="outerHTML"
+            class="checklist-item {% if item.checked %}done{% endif %}">
+        {% csrf_token %}
+        <input type="hidden" name="key" value="{{ item.key }}">
+        <button type="submit" class="checklist-toggle" aria-pressed="{% if item.checked %}true{% else %}false{% endif %}">
+          <span class="checkmark">{% if item.checked %}✓{% endif %}</span>
+          <span class="checklist-label">{{ item.label }}</span>
+        </button>
+      </form>
+    {% endfor %}
+  </div>
+  <p class="help mt-2 mb-0">Checklist items are hints, not a legal test. Record what the controller actually answered.</p>
+</div>

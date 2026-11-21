@@ -1,0 +1,15 @@
+{% load ds_tags %}
+{% if page.has_other_pages %}
+<div class="card-footer row spread">
+  <span class="small muted">Showing {{ page.start_index }}–{{ page.end_index }} of {{ page.paginator.count }}</span>
+  <div class="row">
+    {% if page.has_previous %}
+      <a class="btn btn-sm" href="?{% query_replace page=page.previous_page_number %}">Previous</a>
+    {% endif %}
+    <span class="small muted">Page {{ page.number }} of {{ page.paginator.num_pages }}</span>
+    {% if page.has_next %}
+      <a class="btn btn-sm" href="?{% query_replace page=page.next_page_number %}">Next</a>
+    {% endif %}
+  </div>
+</div>
+{% endif %}

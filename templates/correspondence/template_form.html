@@ -1,0 +1,19 @@
+{% extends "base.html" %}
+{% block title %}{{ title }} · {{ app_name }}{% endblock %}
+{% block content %}
+<div class="breadcrumb"><a href="{% url 'template-list' %}">Templates</a> / {{ title }}</div>
+<div class="page-header">
+  <div>
+    <h1 class="page-title">{{ title }}</h1>
+    <p class="page-subtitle">{% if template %}Saving creates a new version; sent letters keep their original text.{% else %}Start from a right-specific structure and keep the GDPR citation.{% endif %}</p>
+  </div>
+</div>
+<form method="post" class="card">
+  {% csrf_token %}
+  <div class="card-body"><div class="form-grid">{% include "partials/form_fields.html" %}</div></div>
+  <div class="card-footer form-actions">
+    <button class="btn btn-primary" type="submit">{% if template %}Save new version{% else %}Create template{% endif %}</button>
+    <a class="btn" href="{% if template %}{{ template.get_absolute_url }}{% else %}{% url 'template-list' %}{% endif %}">Cancel</a>
+  </div>
+</form>
+{% endblock %}

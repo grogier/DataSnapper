@@ -1,0 +1,104 @@
+{% extends "base.html" %}
+{% load ds_tags %}
+{% block title %}Cases · {{ app_name }}{% endblock %}
+{% block content %}
+<div class="page-header">
+  <div>
+    <h1 class="page-title">Cases</h1>
+    <p class="page-subtitle">{{ total }} case{{ total|pluralize }} · {{ open_count }} still open.</p>
+  </div>
+  <div class="actions">
+    <a class="btn" href="{% url 'organization-list' %}">Companies</a>
+    <a class="btn btn-primary" href="{% url 'case-create' %}">New case</a>
+  </div>
+</div>
+
+<div class="card">
+  <div class="card-body tight">
+    <form method="get" class="row" style="gap:8px;">
+      <input class="input" style="max-width:280px;" type="search" name="q" value="{{ query }}" placeholder="Reference, scope or company">
+      <select class="select" name="status" style="max-width:190px;">
+        <option value="">All statuses</option>
+        {% for value, label in statuses %}
+          <option value="{{ value }}" {% if status == value %}selected{% endif %}>{{ label }}</option>
+        {% endfor %}
+      </select>
+      <select class="select" name="right" style="max-width:230px;">
+        <option value="">All request types</option>
+        {% for value, label in rights %}
+          <option value="{{ value }}" {% if right == value %}selected{% endif %}>{{ label }}</option>
+        {% endfor %}
+      </select>
+      <select class="select" name="organization" style="max-width:210px;">
+        <option value="">All companies</option>
+        {% for org in organizations %}
+          <option value="{{ org.pk }}" {% if organization == org.pk|stringformat:"s" %}selected{% endif %}>{{ org.name }}</option>
+        {% endfor %}
+      </select>
+      <label class="checkbox-row small" style="white-space:nowrap;">
+        <input class="checkbox" type="checkbox" name="overdue" value="1" {% if overdue == "1" %}checked{% endif %}>
+        Overdue only
+      </label>
+      <button class="btn" type="submit">Filter</button>
+      {% if query or status or right or organization or overdue %}
+        <a class="btn btn-ghost" href="{% url 'case-list' %}">Clear</a>
+      {% endif %}
+    </form>
+  </div>
+
+  {% if cases %}
+  <div class="table-wrap">
+    <table class="table">
+      <thead>
+        <tr>
+          <th>Case</th>
+          <th>Company</th>
+          <th>Request</th>
+          <th>Status</th>
+          <th>Sent</th>
+          <th>Deadline</th>
+          <th>Messages</th>
+          <th>Tasks</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>
+      {% for case in cases %}
+        <tr>
+          <td>
+            <a class="link-quiet" href="{{ case.get_absolute_url }}"><strong>{{ case.reference }}</strong></a>
+            {% if case.priority == "high" %}<span class="badge badge-danger">high</span>{% endif %}
+          </td>
+          <td class="small"><a class="link-quiet" href="{{ case.organization.get_absolute_url }}">{{ case.organization.name }}</a></td>
+          <td class="small">{{ case.right_label }}</td>
+          <td><span class="badge {{ case.status|badge_class }}">{{ case.get_status_display }}</span></td>
+          <td class="small">{{ case.sent_at|date:"d M Y"|default:"—" }}</td>
+          <td class="small">
+            {% if case.effective_due %}
+              {% if case.is_overdue %}
+                <span class="badge badge-danger">{{ case.effective_due|date:"d M Y" }}</span>
+              {% elif case.days_left <= 10 %}
+                <span class="badge badge-warning">{{ case.effective_due|date:"d M Y" }}</span>
+              {% else %}
+                {{ case.effective_due|date:"d M Y" }}
+              {% endif %}
+            {% else %}—{% endif %}
+          </td>
+          <td class="small">{{ case.message_count }}</td>
+          <td class="small">{{ case.open_task_count }}</td>
+          <td class="actions-cell"><a class="btn btn-sm" href="{{ case.get_absolute_url }}">Open</a></td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+    <div class="empty">
+      <h3>No cases found</h3>
+      <p>Create a request for a company, or clear the filters.</p>
+      <a class="btn btn-primary" href="{% url 'case-create' %}">New case</a>
+    </div>
+  {% endif %}
+  {% include "partials/pagination.html" %}
+</div>
+{% endblock %}

@@ -1,0 +1,67 @@
+{% extends "base.html" %}
+{% load ds_tags %}
+{% block title %}Audit log · {{ app_name }}{% endblock %}
+{% block content %}
+<div class="page-header">
+  <div>
+    <h1 class="page-title">Audit log</h1>
+    <p class="page-subtitle">{{ total }} entries. Append-only and hash-chained.</p>
+  </div>
+  <div class="actions">
+    <a class="btn" href="{% url 'settings' %}">Settings</a>
+  </div>
+</div>
+
+{% if chain_ok %}
+  <div class="flash success">Audit chain is intact. Every entry links to the previous one.</div>
+{% else %}
+  <div class="flash error">Audit chain is broken at entry {{ bad_id }}. Investigate before relying on this log.</div>
+{% endif %}
+
+<div class="card">
+  <div class="card-body tight">
+    <form method="get" class="row" style="gap:8px;">
+      <input class="input" style="max-width:320px;" type="search" name="q" value="{{ query }}" placeholder="Summary, entity or user">
+      <select class="select" name="action" style="max-width:240px;">
+        <option value="">All actions</option>
+        {% for value in actions %}
+          <option value="{{ value }}" {% if action == value %}selected{% endif %}>{{ value }}</option>
+        {% endfor %}
+      </select>
+      <button class="btn" type="submit">Filter</button>
+      {% if query or action %}<a class="btn btn-ghost" href="{% url 'audit-list' %}">Clear</a>{% endif %}
+    </form>
+  </div>
+
+  {% if entries %}
+  <div class="table-wrap">
+    <table class="table">
+      <thead><tr><th>Time</th><th>Action</th><th>Entity</th><th>Summary</th><th>User</th><th>IP</th><th></th></tr></thead>
+      <tbody>
+      {% for entry in entries %}
+        <tr>
+          <td class="small nowrap">{{ entry.created_at|date:"d M Y H:i" }}</td>
+          <td><span class="badge badge-neutral mono">{{ entry.action }}</span></td>
+          <td class="small">{{ entry.entity_type }}{% if entry.entity_id %} #{{ entry.entity_id }}{% endif %}</td>
+          <td class="small">{{ entry.summary }}</td>
+          <td class="small">{{ entry.actor.username|default:"system" }}</td>
+          <td class="small mono">{{ entry.ip|default:"—" }}</td>
+          <td class="actions-cell">
+            {% if entry.metadata %}
+            <details>
+              <summary class="btn btn-sm btn-ghost">Data</summary>
+              <pre class="message-body mt-1" style="max-width:420px;">{{ entry.metadata }}</pre>
+            </details>
+            {% endif %}
+          </td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+    <div class="empty"><h3>No audit entries</h3><p>Actions you take will be recorded here.</p></div>
+  {% endif %}
+  {% include "partials/pagination.html" %}
+</div>
+{% endblock %}

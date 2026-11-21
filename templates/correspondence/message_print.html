@@ -1,0 +1,45 @@
+{% extends "base.html" %}
+{% block title %}Print · {{ message.subject }}{% endblock %}
+{% block content %}
+<div class="page-header no-print">
+  <div>
+    <h1 class="page-title">Printable letter</h1>
+    <p class="page-subtitle">{{ case.reference }} · {{ case.organization.name }}</p>
+  </div>
+  <div class="actions">
+    <a class="btn" href="{% url 'message-detail' case.pk message.pk %}">Back</a>
+    <button class="btn btn-primary" type="button" data-print>Print / save as PDF</button>
+  </div>
+</div>
+
+<div class="card letter-print">
+  <div class="card-body">
+    <div class="spread" style="align-items:flex-start;">
+      <div>
+        <strong>{{ profile.full_name }}</strong><br>
+        {{ profile.postal_address|linebreaksbr }}<br>
+        {{ profile.email }}<br>
+        {{ profile.phone }}
+      </div>
+      <div class="small muted" style="text-align:right;">{{ today|date:"j F Y" }}</div>
+    </div>
+
+    <div class="mt-3">
+      <strong>{{ organization.name }}</strong><br>
+      {% if contact.name %}{{ contact.name }}<br>{% endif %}
+      {% if contact.email %}{{ contact.email }}<br>{% endif %}
+      {{ organization.postal_address|linebreaksbr }}
+    </div>
+
+    <div class="mt-3">
+      <strong>{{ message.subject }}</strong>
+    </div>
+
+    <div class="letter-preview" style="border:0;padding:0;">{{ message.body }}</div>
+
+    <div class="small muted mt-3" style="border-top:1px solid var(--border);padding-top:8px;">
+      Reference: {{ case.reference }} · {{ case.right_label }}
+    </div>
+  </div>
+</div>
+{% endblock %}

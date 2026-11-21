@@ -1,0 +1,308 @@
+{% extends "base.html" %}
+{% load ds_tags %}
+{% block title %}{{ case.reference }} · {{ app_name }}{% endblock %}
+{% block content %}
+<div class="breadcrumb"><a href="{% url 'case-list' %}">Cases</a> / {{ case.reference }}</div>
+<div class="page-header">
+  <div>
+    <h1 class="page-title">{{ case.reference }}</h1>
+    <p class="page-subtitle">
+      <a href="{{ case.organization.get_absolute_url }}">{{ case.organization.name }}</a>
+      · {{ case.right_label }} · opened {{ case.opened_at|date:"d M Y" }}
+    </p>
+    <div class="row mt-1">
+      <span class="badge {{ case.status|badge_class }}">{{ case.get_status_display }}</span>
+      <span class="badge {% if case.priority == 'high' %}badge-danger{% elif case.priority == 'low' %}badge-neutral{% else %}badge-info{% endif %}">{{ case.get_priority_display }} priority</span>
+      <span class="pill">{{ case.right_label }}</span>
+      <span class="pill">{{ case.jurisdiction }}</span>
+      {% if case.fees %}<span class="pill">Fee: € {{ case.fees }}</span>{% endif %}
+    </div>
+  </div>
+  <div class="actions">
+    <a class="btn" href="{% url 'case-update' case.pk %}">Edit</a>
+    <a class="btn" href="{% url 'case-reply' case.pk %}">Log reply</a>
+    <a class="btn btn-primary" href="{% url 'case-compose' case.pk %}">Compose letter</a>
+  </div>
+</div>
+
+<div class="detail-grid">
+  <div class="stack">
+    <div class="card">
+      <div class="card-header">
+        <div>
+          <h2 class="card-title">Timeline</h2>
+          <p class="card-subtitle">Every status change, message, document and note.</p>
+        </div>
+        <span class="pill">{{ events|length }} events</span>
+      </div>
+      <div class="card-body">
+        {% if events %}
+        <ul class="timeline">
+          {% for event in events %}
+          <li class="timeline-item">
+            <span class="timeline-dot {{ event.event_type }}"></span>
+            <div class="timeline-title">
+              {{ event.summary }}
+              {% if event.event_type == "message" and event.metadata.message_id %}
+                <a class="small" href="{% url 'message-detail' case.pk event.metadata.message_id %}">open message</a>
+              {% endif %}
+            </div>
+            <div class="timeline-meta">
+              {{ event.created_at|date:"d M Y H:i" }}{% if event.actor %} · {{ event.actor.username }}{% endif %}
+            </div>
+            {% if event.detail %}<div class="timeline-detail">{{ event.detail }}</div>{% endif %}
+          </li>
+          {% endfor %}
+        </ul>
+        {% else %}
+          <div class="empty"><h3>No events yet</h3><p>Actions you take will appear here.</p></div>
+        {% endif %}
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-header">
+        <div>
+          <h2 class="card-title">Messages</h2>
+          <p class="card-subtitle">Drafts, sent letters and replies.</p>
+        </div>
+        <a class="btn btn-sm btn-primary" href="{% url 'case-compose' case.pk %}">Compose</a>
+      </div>
+      {% if case_messages %}
+      <div class="table-wrap">
+        <table class="table">
+          <thead><tr><th>Direction</th><th>Subject</th><th>Status</th><th>Created</th><th>Sent / received</th><th></th></tr></thead>
+          <tbody>
+          {% for message in case_messages %}
+            <tr>
+              <td><span class="badge {% if message.direction == 'outbound' %}badge-info{% else %}badge-success{% endif %}">{{ message.get_direction_display }}</span></td>
+              <td><a class="link-quiet" href="{% url 'message-detail' case.pk message.pk %}">{{ message.subject }}</a>
+                {% if message.template %}<div class="tiny muted">{{ message.template.name }} v{{ message.template_version }}</div>{% endif %}
+              </td>
+              <td><span class="badge {% if message.status == 'draft' %}badge-warning{% elif message.status == 'sent' %}badge-info{% else %}badge-success{% endif %}">{{ message.get_status_display }}</span></td>
+              <td class="small">{{ message.created_at|date:"d M Y" }}</td>
+              <td class="small">{{ message.sent_at|date:"d M Y H:i"|default:message.received_at|date:"d M Y H:i"|default:"—" }}</td>
+              <td class="actions-cell"><a class="btn btn-sm" href="{% url 'message-detail' case.pk message.pk %}">Open</a></td>
+            </tr>
+          {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      {% else %}
+        <div class="empty">
+          <h3>No messages yet</h3>
+          <p>Compose a letter from a template, then export it as PDF or email.</p>
+          <a class="btn btn-primary" href="{% url 'case-compose' case.pk %}">Compose letter</a>
+        </div>
+      {% endif %}
+    </div>
+
+    <div class="card">
+      <div class="card-header">
+        <div>
+          <h2 class="card-title">Documents</h2>
+          <p class="card-subtitle">Proof of sending, responses, identity documents and other evidence.</p>
+        </div>
+      </div>
+      {% if attachments %}
+      <div class="table-wrap">
+        <table class="table">
+          <thead><tr><th>Document</th><th>Kind</th><th>Size</th><th>Added</th><th></th></tr></thead>
+          <tbody>
+          {% for attachment in attachments %}
+            <tr>
+              <td>
+                <a class="link-quiet" href="{% url 'attachment-download' attachment.pk %}">{{ attachment.original_name }}</a>
+                {% if attachment.is_encrypted %}<span class="badge badge-success">encrypted</span>{% endif %}
+                {% if attachment.notes %}<div class="tiny muted">{{ attachment.notes }}</div>{% endif %}
+              </td>
+              <td class="small">{{ attachment.get_kind_display }}</td>
+              <td class="small">{{ attachment.size|file_size }}</td>
+              <td class="small">{{ attachment.created_at|date:"d M Y" }}</td>
+              <td class="actions-cell">
+                <form class="inline-form" method="post" action="{% url 'attachment-delete' attachment.pk %}" data-confirm="Delete this document?">
+                  {% csrf_token %}
+                  <button class="btn btn-sm btn-ghost" type="submit">Delete</button>
+                </form>
+              </td>
+            </tr>
+          {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      {% else %}
+        <div class="empty"><h3>No documents</h3><p>Upload proof of sending or a response you received.</p></div>
+      {% endif %}
+      <div class="card-footer">
+        <details>
+          <summary class="small"><strong>Upload a document</strong></summary>
+          <form method="post" action="{% url 'case-attachment-upload' case.pk %}" enctype="multipart/form-data" class="form-grid mt-2">
+            {% csrf_token %}
+            {% include "partials/form_fields.html" with form=attachment_form %}
+            <div class="full form-actions">
+              <button class="btn btn-primary" type="submit">Upload</button>
+            </div>
+          </form>
+        </details>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-header">
+        <div>
+          <h2 class="card-title">Tasks</h2>
+          <p class="card-subtitle">{{ open_tasks|length }} open task{{ open_tasks|length|pluralize }}.</p>
+        </div>
+      </div>
+      {% if tasks %}
+      <div class="table-wrap">
+        <table class="table">
+          <thead><tr><th>Task</th><th>Type</th><th>Due</th></tr></thead>
+          <tbody>
+          {% for task in tasks %}
+            {% include "cases/_task_row.html" with task=task case=case %}
+          {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      {% else %}
+        <div class="empty"><h3>No tasks</h3><p>Add a follow-up or escalation reminder.</p></div>
+      {% endif %}
+      <div class="card-footer">
+        <details>
+          <summary class="small"><strong>Add a task</strong></summary>
+          <form method="post" action="{% url 'task-create' case.pk %}" class="form-grid mt-2">
+            {% csrf_token %}
+            {% include "partials/form_fields.html" with form=task_form %}
+            <div class="full form-actions">
+              <button class="btn btn-primary" type="submit">Add task</button>
+            </div>
+          </form>
+        </details>
+      </div>
+    </div>
+  </div>
+
+  <div class="stack">
+    <div class="card">
+      <div class="card-header"><h2 class="card-title">Deadline &amp; status</h2></div>
+      <div class="card-body">
+        {% if case.effective_due %}
+          <div class="deadline {{ case.deadline_tone }} mb-2">
+            <div>
+              <div class="deadline-label">{% if case.is_overdue %}Overdue{% else %}Response due{% endif %}</div>
+              <div class="deadline-value">{{ case.effective_due|date:"d M Y" }}</div>
+            </div>
+            <div style="margin-left:auto;text-align:right;">
+              {% if case.is_overdue %}
+                <span class="badge badge-danger">{{ case.days_left }} days</span>
+              {% else %}
+                <span class="badge badge-neutral">{{ case.days_left }} days left</span>
+              {% endif %}
+              {% if case.extended_due_at %}<div class="tiny mt-1">extended</div>{% endif %}
+            </div>
+          </div>
+        {% else %}
+          <div class="deadline mb-2">
+            <div>
+              <div class="deadline-label">Deadline</div>
+              <div class="deadline-value">Not started</div>
+            </div>
+            <div class="small muted" style="margin-left:auto;">Mark the case sent to start the one-month clock.</div>
+          </div>
+        {% endif %}
+
+        {% if transition_form.status.field.choices %}
+        <form method="post" action="{% url 'case-transition' case.pk %}">
+          {% csrf_token %}
+          <div class="field mb-2">
+            <label class="label" for="{{ transition_form.status.id_for_label }}">Move to</label>
+            {{ transition_form.status }}
+          </div>
+          <div class="field mb-2">
+            <label class="label" for="{{ transition_form.note.id_for_label }}">Note</label>
+            {{ transition_form.note }}
+          </div>
+          <button class="btn btn-primary btn-block" type="submit">Update status</button>
+        </form>
+        {% else %}
+          <p class="small muted">This case is closed. Reopen it from the edit page if needed.</p>
+        {% endif %}
+
+        {% if case.sent_at and not case.extended_due_at %}
+        <div class="divider"></div>
+        <details>
+          <summary class="small"><strong>Record an extension notice</strong></summary>
+          <form method="post" action="{% url 'case-extend' case.pk %}" class="mt-2">
+            {% csrf_token %}
+            {% include "partials/form_fields.html" with form=extend_form %}
+            <div class="form-actions">
+              <button class="btn" type="submit">Extend deadline</button>
+            </div>
+          </form>
+        </details>
+        {% endif %}
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-header">
+        <div>
+          <h2 class="card-title">Response checklist</h2>
+          <p class="card-subtitle">What a complete answer should contain.</p>
+        </div>
+      </div>
+      <div class="card-body">
+        {% include "cases/_checklist.html" %}
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-header"><h2 class="card-title">Details</h2></div>
+      <div class="card-body">
+        <dl class="meta-list">
+          <dt>Company</dt><dd><a href="{{ case.organization.get_absolute_url }}">{{ case.organization.name }}</a></dd>
+          <dt>Recipient</dt><dd>{{ case.organization.best_email|default:"—" }}</dd>
+          <dt>Scope</dt><dd>{{ case.scope|linebreaksbr|default:"All personal data" }}</dd>
+          <dt>Opened</dt><dd>{{ case.opened_at|date:"d M Y" }}</dd>
+          <dt>Sent</dt><dd>{{ case.sent_at|date:"d M Y"|default:"—" }}</dd>
+          <dt>Received</dt><dd>{{ case.received_at|date:"d M Y"|default:"—" }}</dd>
+          <dt>Identity check</dt><dd>{{ case.identity_check_at|date:"d M Y"|default:"—" }}</dd>
+          <dt>Extension notice</dt><dd>{{ case.extension_notice_at|date:"d M Y"|default:"—" }}</dd>
+          <dt>Outcome</dt><dd>{{ case.get_outcome_display }}</dd>
+          <dt>Closed</dt><dd>{{ case.closed_at|date:"d M Y"|default:"—" }}</dd>
+        </dl>
+        {% if case.notes %}
+          <div class="divider"></div>
+          <div class="small">{{ case.notes|linebreaks }}</div>
+        {% endif %}
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-header"><h2 class="card-title">Add a note</h2></div>
+      <div class="card-body">
+        <form method="post" action="{% url 'case-note' case.pk %}">
+          {% csrf_token %}
+          <div class="field">
+            <textarea class="textarea" name="note" rows="4" placeholder="What happened? Keep it factual and dated."></textarea>
+          </div>
+          <div class="form-actions">
+            <button class="btn" type="submit">Add note</button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-header"><h2 class="card-title">Quick actions</h2></div>
+      <div class="card-body stack" style="gap:8px;">
+        <a class="btn btn-block" href="{% url 'case-reply' case.pk %}">Log a reply</a>
+        <a class="btn btn-block" href="{% url 'case-compose' case.pk %}">Compose a letter</a>
+        <a class="btn btn-block" href="{% url 'evidence-upload' %}">Upload to evidence vault</a>
+        <a class="btn btn-block" href="{% url 'case-update' case.pk %}">Edit case details</a>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

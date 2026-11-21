@@ -1,0 +1,38 @@
+{% extends "base.html" %}
+{% block title %}Calendar · {{ app_name }}{% endblock %}
+{% block content %}
+<div class="page-header">
+  <div>
+    <h1 class="page-title">Calendar</h1>
+    <p class="page-subtitle">Deadlines and tasks for {{ month_label }}.</p>
+  </div>
+  <div class="actions">
+    <a class="btn" href="?month={{ prev_month }}">← Previous</a>
+    <a class="btn" href="{% url 'calendar' %}">Today</a>
+    <a class="btn" href="?month={{ next_month }}">Next →</a>
+    <a class="btn btn-primary" href="{% url 'calendar-ics' %}">Download .ics</a>
+  </div>
+</div>
+
+<div class="card">
+  <div class="calendar">
+    {% for weekday in weekdays %}<div class="calendar-head">{{ weekday }}</div>{% endfor %}
+    {% for week in weeks %}
+      {% for day in week %}
+        <div class="calendar-day {% if not day.in_month %}out{% endif %} {% if day.is_today %}today{% endif %}">
+          <div class="daynum">{{ day.date|date:"j" }}</div>
+          {% for item in day.items %}
+            <a class="calendar-item {{ item.tone }}" href="{{ item.url }}" title="{{ item.label }}">{{ item.label }}</a>
+          {% endfor %}
+        </div>
+      {% endfor %}
+    {% endfor %}
+  </div>
+  <div class="card-footer row">
+    <span class="badge badge-danger">overdue</span>
+    <span class="badge badge-warning">task or due soon</span>
+    <span class="badge badge-info">case deadline</span>
+    <span class="small muted" style="margin-left:auto;">The .ics feed contains every open case and task.</span>
+  </div>
+</div>
+{% endblock %}

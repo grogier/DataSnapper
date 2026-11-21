@@ -1,0 +1,118 @@
+{% extends "base.html" %}
+{% load ds_tags %}
+{% block title %}{{ message.subject }} · {{ app_name }}{% endblock %}
+{% block content %}
+<div class="breadcrumb"><a href="{% url 'case-list' %}">Cases</a> / <a href="{{ case.get_absolute_url }}">{{ case.reference }}</a> / Message</div>
+<div class="page-header">
+  <div>
+    <h1 class="page-title">{{ message.subject }}</h1>
+    <p class="page-subtitle">
+      {{ case.organization.name }} · {{ case.right_label }} ·
+      <span class="badge {% if message.status == 'draft' %}badge-warning{% elif message.status == 'sent' %}badge-info{% else %}badge-success{% endif %}">{{ message.get_status_display }}</span>
+    </p>
+  </div>
+  <div class="actions">
+    <a class="btn" href="{{ case.get_absolute_url }}">Back to case</a>
+    {% if pdf_available %}<a class="btn" href="{% url 'message-pdf' case.pk message.pk %}">PDF</a>{% endif %}
+    <a class="btn" href="{% url 'message-print' case.pk message.pk %}">Print</a>
+    <a class="btn" href="{% url 'message-eml' case.pk message.pk %}">.eml</a>
+    <button class="btn" type="button" data-copy="#copy-body">Copy text</button>
+  </div>
+</div>
+
+<div class="detail-grid">
+  <div class="stack">
+    {% if message.is_draft %}
+    <div class="card" style="border-color:#fedf89;">
+      <div class="card-header">
+        <div>
+          <h2 class="card-title">Ready to send?</h2>
+          <p class="card-subtitle">Export the letter, send it through your own mail client or web form, then record it here.</p>
+        </div>
+      </div>
+      <div class="card-body">
+        <form method="post" action="{% url 'message-send' case.pk message.pk %}" class="row" style="align-items:flex-end;">
+          {% csrf_token %}
+          <div class="field" style="min-width:260px;">
+            <label class="label" for="send_method">How did you send it?</label>
+            <select class="select" name="send_method" id="send_method">
+              {% for value, label in send_methods %}
+                <option value="{{ value }}" {% if value == "manual_export" %}selected{% endif %}>{{ label }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <button class="btn btn-success" type="submit">Mark as sent</button>
+        </form>
+        <p class="help mt-2 mb-0">Marking it sent starts the one-month deadline on the case. The rendered text stays unchanged.</p>
+      </div>
+    </div>
+    {% endif %}
+
+    <div class="card">
+      <div class="card-header">
+        <div>
+          <h2 class="card-title">Letter</h2>
+          <p class="card-subtitle">
+            {% if message.template %}{{ message.template.name }} v{{ message.template_version }} · {{ message.template.get_locale_display }}{% else %}Free text{% endif %}
+          </p>
+        </div>
+      </div>
+      <div class="card-body">
+        <div class="letter-preview">{{ message.body }}</div>
+        <textarea id="copy-body" class="copy-source">{{ message.body }}</textarea>
+      </div>
+    </div>
+  </div>
+
+  <div class="stack">
+    <div class="card">
+      <div class="card-header"><h2 class="card-title">Message details</h2></div>
+      <div class="card-body">
+        <dl class="meta-list">
+          <dt>Direction</dt><dd>{{ message.get_direction_display }}</dd>
+          <dt>Channel</dt><dd>{{ message.get_channel_display }}</dd>
+          <dt>From</dt><dd>{{ message.from_address|default:"—" }}</dd>
+          <dt>To</dt><dd>{{ message.to_address|default:"—" }}</dd>
+          <dt>Created</dt><dd>{{ message.created_at|date:"d M Y H:i" }}</dd>
+          <dt>Sent</dt><dd>{{ message.sent_at|date:"d M Y H:i"|default:"—" }}</dd>
+          <dt>Received</dt><dd>{{ message.received_at|date:"d M Y H:i"|default:"—" }}</dd>
+          <dt>Send method</dt><dd>{{ message.get_send_method_display|default:"—" }}</dd>
+          <dt>Message-ID</dt><dd class="mono tiny">{{ message.message_id|default:"—" }}</dd>
+        </dl>
+        {% if message.notes %}
+          <div class="divider"></div>
+          <div class="small">{{ message.notes|linebreaks }}</div>
+        {% endif %}
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-header"><h2 class="card-title">Actions</h2></div>
+      <div class="card-body stack" style="gap:8px;">
+        {% if pdf_available %}<a class="btn btn-block" href="{% url 'message-pdf' case.pk message.pk %}">Download PDF</a>{% endif %}
+        <a class="btn btn-block" href="{% url 'message-print' case.pk message.pk %}">Printable page</a>
+        <a class="btn btn-block" href="{% url 'message-eml' case.pk message.pk %}">Download .eml</a>
+        <a class="btn btn-block" href="{% url 'case-attachment-upload' case.pk %}">Upload proof of sending</a>
+        {% if message.is_draft %}
+          <form method="post" action="{% url 'message-delete' case.pk message.pk %}" data-confirm="Delete this draft?">
+            {% csrf_token %}
+            <button class="btn btn-block btn-ghost" type="submit">Delete draft</button>
+          </form>
+        {% endif %}
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-header"><h2 class="card-title">Case</h2></div>
+      <div class="card-body">
+        <dl class="meta-list">
+          <dt>Reference</dt><dd><a href="{{ case.get_absolute_url }}">{{ case.reference }}</a></dd>
+          <dt>Company</dt><dd><a href="{{ case.organization.get_absolute_url }}">{{ case.organization.name }}</a></dd>
+          <dt>Status</dt><dd><span class="badge {{ case.status|badge_class }}">{{ case.get_status_display }}</span></dd>
+          <dt>Deadline</dt><dd>{% if case.effective_due %}{{ case.effective_due|date:"d M Y" }}{% else %}Not started{% endif %}</dd>
+        </dl>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

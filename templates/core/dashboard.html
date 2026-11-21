@@ -1,0 +1,197 @@
+{% extends "base.html" %}
+{% load ds_tags %}
+{% block title %}Dashboard · {{ app_name }}{% endblock %}
+{% block content %}
+<div class="page-header">
+  <div>
+    <h1 class="page-title">Dashboard</h1>
+    <p class="page-subtitle">{{ today|date:"l j F Y" }} · your open cases and upcoming deadlines.</p>
+  </div>
+  <div class="actions">
+    <a class="btn" href="{% url 'organization-create' %}">Add company</a>
+    <a class="btn btn-primary" href="{% url 'case-create' %}">New case</a>
+  </div>
+</div>
+
+{% if not profile %}
+<div class="card" style="border-color:#fedf89;background:#fffaeb;">
+  <div class="card-body row spread">
+    <div>
+      <strong>Set up your profile first.</strong>
+      <div class="small muted">Letters need your name, email and postal address. This takes a minute.</div>
+    </div>
+    <a class="btn btn-primary" href="{% url 'settings' %}">Open settings</a>
+  </div>
+</div>
+{% endif %}
+
+<div class="grid grid-4 mb-2">
+  <a class="stat" href="{% url 'case-list' %}">
+    <div class="stat-value">{{ stats.open_cases }}</div>
+    <div class="stat-label">Open cases</div>
+  </a>
+  <a class="stat danger" href="{% url 'case-list' %}?overdue=1">
+    <div class="stat-value">{{ stats.overdue }}</div>
+    <div class="stat-label">Overdue</div>
+  </a>
+  <a class="stat warning" href="{% url 'calendar' %}">
+    <div class="stat-value">{{ stats.due_soon }}</div>
+    <div class="stat-label">Due within 10 days</div>
+  </a>
+  <a class="stat" href="{% url 'case-list' %}?status=draft">
+    <div class="stat-value">{{ stats.drafts }}</div>
+    <div class="stat-label">Drafts to finish</div>
+  </a>
+</div>
+
+<div class="detail-grid">
+  <div class="stack">
+    <div class="card">
+      <div class="card-header">
+        <div>
+          <h2 class="card-title">Overdue</h2>
+          <p class="card-subtitle">The one-month GDPR clock has passed. Consider a follow-up or escalation.</p>
+        </div>
+        <a class="btn btn-sm" href="{% url 'case-list' %}?overdue=1">View all</a>
+      </div>
+      {% if overdue_cases %}
+      <div class="table-wrap">
+        <table class="table">
+          <thead><tr><th>Case</th><th>Company</th><th>Right</th><th>Deadline</th><th>Status</th></tr></thead>
+          <tbody>
+          {% for case in overdue_cases %}
+            <tr>
+              <td><a href="{{ case.get_absolute_url }}"><strong>{{ case.reference }}</strong></a></td>
+              <td>{{ case.organization.name }}</td>
+              <td class="small">{{ case.right_label }}</td>
+              <td><span class="badge badge-danger">{{ case.effective_due|date:"d M Y" }}</span></td>
+              <td><span class="badge {{ case.status|badge_class }}">{{ case.get_status_display }}</span></td>
+            </tr>
+          {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      {% else %}
+        <div class="empty"><h3>Nothing overdue</h3><p>Every case is still inside its deadline.</p></div>
+      {% endif %}
+    </div>
+
+    <div class="card">
+      <div class="card-header">
+        <div>
+          <h2 class="card-title">Due soon</h2>
+          <p class="card-subtitle">Deadlines in the next ten days.</p>
+        </div>
+        <a class="btn btn-sm" href="{% url 'calendar' %}">Calendar</a>
+      </div>
+      {% if due_soon_cases %}
+      <div class="table-wrap">
+        <table class="table">
+          <thead><tr><th>Case</th><th>Company</th><th>Right</th><th>Deadline</th><th>Days left</th></tr></thead>
+          <tbody>
+          {% for case in due_soon_cases %}
+            <tr>
+              <td><a href="{{ case.get_absolute_url }}"><strong>{{ case.reference }}</strong></a></td>
+              <td>{{ case.organization.name }}</td>
+              <td class="small">{{ case.right_label }}</td>
+              <td>{{ case.effective_due|date:"d M Y" }}</td>
+              <td><span class="badge badge-warning">{{ case.days_left }} days</span></td>
+            </tr>
+          {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      {% else %}
+        <div class="empty"><h3>No deadlines this week</h3><p>Send a new request or review a draft.</p></div>
+      {% endif %}
+    </div>
+
+    <div class="card">
+      <div class="card-header">
+        <div>
+          <h2 class="card-title">Recent activity</h2>
+          <p class="card-subtitle">Everything that changed in the case file.</p>
+        </div>
+        <a class="btn btn-sm" href="{% url 'audit-list' %}">Audit log</a>
+      </div>
+      <div class="card-body">
+        {% if recent_events %}
+        <ul class="timeline">
+          {% for event in recent_events %}
+          <li class="timeline-item">
+            <span class="timeline-dot {{ event.event_type }}"></span>
+            <div class="timeline-title">
+              <a href="{{ event.case.get_absolute_url }}" class="link-quiet">{{ event.summary }}</a>
+            </div>
+            <div class="timeline-meta">
+              {{ event.case.reference }} · {{ event.case.organization.name }} ·
+              {{ event.created_at|date:"d M Y H:i" }}{% if event.actor %} · {{ event.actor.username }}{% endif %}
+            </div>
+          </li>
+          {% endfor %}
+        </ul>
+        {% else %}
+          <div class="empty"><h3>No activity yet</h3><p>Create a company and a case to get started.</p></div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+
+  <div class="stack">
+    <div class="card">
+      <div class="card-header">
+        <h2 class="card-title">Upcoming tasks</h2>
+        <a class="btn btn-sm" href="{% url 'case-list' %}">Cases</a>
+      </div>
+      <div class="card-body">
+        {% if upcoming_tasks %}
+          {% for task in upcoming_tasks %}
+          <div class="spread" style="padding:8px 0;border-bottom:1px solid var(--border);">
+            <div>
+              <a class="link-quiet" href="{{ task.case.get_absolute_url }}">{{ task.title }}</a>
+              <div class="tiny muted">{{ task.case.reference }} · {{ task.case.organization.name }}</div>
+            </div>
+            <span class="badge {% if task.is_overdue %}badge-danger{% else %}badge-neutral{% endif %}">{{ task.due_at|date:"d M" }}</span>
+          </div>
+          {% endfor %}
+        {% else %}
+          <p class="small muted">No tasks due in the next two weeks.</p>
+        {% endif %}
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-header">
+        <h2 class="card-title">Recently opened</h2>
+      </div>
+      <div class="card-body">
+        {% for case in recent_cases %}
+        <div class="spread" style="padding:8px 0;border-bottom:1px solid var(--border);">
+          <div>
+            <a class="link-quiet" href="{{ case.get_absolute_url }}">{{ case.reference }}</a>
+            <div class="tiny muted">{{ case.organization.name }} · {{ case.right_label }}</div>
+          </div>
+          <span class="badge {{ case.status|badge_class }}">{{ case.get_status_display }}</span>
+        </div>
+        {% empty %}
+          <p class="small muted">No cases yet.</p>
+        {% endfor %}
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-header"><h2 class="card-title">At a glance</h2></div>
+      <div class="card-body">
+        <dl class="meta-list">
+          <dt>Companies</dt><dd>{{ stats.organizations }}</dd>
+          <dt>Open tasks</dt><dd>{{ stats.open_tasks }}</dd>
+          <dt>Documents</dt><dd>{{ stats.evidence }}</dd>
+          <dt>Audit chain</dt><dd>{% if audit_ok %}<span class="badge badge-success">active</span>{% else %}<span class="badge badge-neutral">empty</span>{% endif %}</dd>
+        </dl>
+        <div class="divider"></div>
+        <a class="btn btn-block" href="{% url 'evidence-upload' %}">Upload a document</a>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

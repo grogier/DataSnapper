@@ -1,0 +1,21 @@
+{% extends "base.html" %}
+{% block title %}Log reply · {{ case.reference }}{% endblock %}
+{% block content %}
+<div class="breadcrumb"><a href="{% url 'case-list' %}">Cases</a> / <a href="{{ case.get_absolute_url }}">{{ case.reference }}</a> / Log reply</div>
+<div class="page-header">
+  <div>
+    <h1 class="page-title">Log a reply</h1>
+    <p class="page-subtitle">{{ case.organization.name }} · {{ case.right_label }}</p>
+  </div>
+  <div class="actions"><a class="btn" href="{{ case.get_absolute_url }}">Back to case</a></div>
+</div>
+<form method="post" class="card">
+  {% csrf_token %}
+  <div class="card-body"><div class="form-grid">{% include "partials/form_fields.html" %}</div></div>
+  <div class="card-footer form-actions">
+    <button class="btn btn-primary" type="submit">Log reply</button>
+    <a class="btn" href="{{ case.get_absolute_url }}">Cancel</a>
+  </div>
+</form>
+<p class="help mt-2">Paste the reply text so the case file stays self-contained. Upload attachments and data packages on the case page.</p>
+{% endblock %}

@@ -1,0 +1,71 @@
+{% extends "base.html" %}
+{% load ds_tags %}
+{% block title %}Templates · {{ app_name }}{% endblock %}
+{% block content %}
+<div class="page-header">
+  <div>
+    <h1 class="page-title">Templates</h1>
+    <p class="page-subtitle">{{ total }} letter template{{ total|pluralize }}. Editing a template creates a new version.</p>
+  </div>
+  <div class="actions">
+    <a class="btn btn-primary" href="{% url 'template-create' %}">New template</a>
+  </div>
+</div>
+
+<div class="card">
+  <div class="card-body tight">
+    <form method="get" class="row" style="gap:8px;">
+      <input class="input" style="max-width:280px;" type="search" name="q" value="{{ query }}" placeholder="Name or slug">
+      <select class="select" name="right" style="max-width:240px;">
+        <option value="">All request types</option>
+        {% for value, label in rights %}
+          <option value="{{ value }}" {% if right == value %}selected{% endif %}>{{ label }}</option>
+        {% endfor %}
+      </select>
+      <select class="select" name="locale" style="max-width:150px;">
+        <option value="">All languages</option>
+        <option value="en" {% if locale == "en" %}selected{% endif %}>English</option>
+        <option value="nl" {% if locale == "nl" %}selected{% endif %}>Nederlands</option>
+      </select>
+      <select class="select" name="active" style="max-width:150px;">
+        <option value="">All versions</option>
+        <option value="1" {% if active == "1" %}selected{% endif %}>Active</option>
+        <option value="0" {% if active == "0" %}selected{% endif %}>Inactive</option>
+      </select>
+      <button class="btn" type="submit">Filter</button>
+      {% if query or right or locale or active %}<a class="btn btn-ghost" href="{% url 'template-list' %}">Clear</a>{% endif %}
+    </form>
+  </div>
+
+  {% if templates %}
+  <div class="table-wrap">
+    <table class="table">
+      <thead><tr><th>Template</th><th>Request</th><th>Language</th><th>Version</th><th>State</th><th>Updated</th><th></th></tr></thead>
+      <tbody>
+      {% for template in templates %}
+        <tr>
+          <td>
+            <a class="link-quiet" href="{{ template.get_absolute_url }}"><strong>{{ template.name }}</strong></a>
+            <div class="tiny muted mono">{{ template.slug }}</div>
+          </td>
+          <td class="small">{{ template.right|right_label }}</td>
+          <td class="small">{{ template.get_locale_display }}</td>
+          <td class="small">v{{ template.version }}</td>
+          <td>{% if template.is_active %}<span class="badge badge-success">active</span>{% else %}<span class="badge badge-neutral">archived</span>{% endif %}</td>
+          <td class="small">{{ template.updated_at|date:"d M Y" }}</td>
+          <td class="actions-cell"><a class="btn btn-sm" href="{{ template.get_absolute_url }}">Open</a></td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+    <div class="empty">
+      <h3>No templates found</h3>
+      <p>Run <span class="kbd">python manage.py seed_templates</span> or create one here.</p>
+      <a class="btn btn-primary" href="{% url 'template-create' %}">New template</a>
+    </div>
+  {% endif %}
+  {% include "partials/pagination.html" %}
+</div>
+{% endblock %}

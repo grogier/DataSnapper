@@ -1,0 +1,23 @@
+{% load ds_tags %}
+<tr id="task-{{ task.pk }}" class="{% if task.status == 'done' %}muted{% endif %}">
+  <td>
+    <form method="post"
+          action="{% url 'task-toggle' case.pk task.pk %}"
+          hx-post="{% url 'task-toggle' case.pk task.pk %}"
+          hx-target="closest tr"
+          hx-swap="outerHTML">
+      {% csrf_token %}
+      <button type="submit" class="task-check" aria-pressed="{% if task.status == 'done' %}true{% else %}false{% endif %}">
+        <span class="checkmark">{% if task.status == 'done' %}✓{% endif %}</span>
+        <span class="{% if task.status == 'done' %}done{% endif %}">{{ task.title }}</span>
+      </button>
+    </form>
+    {% if task.notes %}<div class="tiny muted mt-1">{{ task.notes }}</div>{% endif %}
+  </td>
+  <td class="small">{{ task.get_task_type_display }}</td>
+  <td class="small">
+    {% if task.due_at %}
+      {% if task.is_overdue %}<span class="badge badge-danger">{{ task.due_at|date:"d M Y" }}</span>{% else %}{{ task.due_at|date:"d M Y" }}{% endif %}
+    {% else %}—{% endif %}
+  </td>
+</tr>

@@ -1,0 +1,19 @@
+{% extends "base.html" %}
+{% block title %}Upload document · {{ app_name }}{% endblock %}
+{% block content %}
+<div class="breadcrumb"><a href="{% url 'evidence-list' %}">Evidence</a> / Upload</div>
+<div class="page-header">
+  <div>
+    <h1 class="page-title">Upload document</h1>
+    <p class="page-subtitle">Identity documents are encrypted at rest. Other files are stored in the local data volume.</p>
+  </div>
+</div>
+<form method="post" enctype="multipart/form-data" class="card">
+  {% csrf_token %}
+  <div class="card-body"><div class="form-grid">{% include "partials/form_fields.html" %}</div></div>
+  <div class="card-footer form-actions">
+    <button class="btn btn-primary" type="submit">Upload</button>
+    <a class="btn" href="{% url 'evidence-list' %}">Cancel</a>
+  </div>
+</form>
+{% endblock %}

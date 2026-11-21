@@ -1,0 +1,180 @@
+{% extends "base.html" %}
+{% load ds_tags %}
+{% block title %}{{ organization.name }} · {{ app_name }}{% endblock %}
+{% block content %}
+<div class="breadcrumb"><a href="{% url 'organization-list' %}">Companies</a> / {{ organization.name }}</div>
+<div class="page-header">
+  <div>
+    <h1 class="page-title">{{ organization.name }}</h1>
+    <p class="page-subtitle">
+      {{ organization.get_category_display }} · {{ organization.country|default:"Country unknown" }}
+      · <span class="badge {% if organization.status == 'active' %}badge-success{% elif organization.status == 'blocked' %}badge-danger{% else %}badge-neutral{% endif %}">{{ organization.get_status_display }}</span>
+    </p>
+  </div>
+  <div class="actions">
+    <a class="btn" href="{% url 'organization-update' organization.pk %}">Edit</a>
+    <a class="btn btn-primary" href="{% url 'case-create' %}?organization={{ organization.pk }}">New case</a>
+    <a class="btn btn-ghost" href="{% url 'organization-delete' organization.pk %}">Delete</a>
+  </div>
+</div>
+
+<div class="detail-grid">
+  <div class="stack">
+    <div class="card">
+      <div class="card-header">
+        <div>
+          <h2 class="card-title">Cases</h2>
+          <p class="card-subtitle">Requests sent to this organisation.</p>
+        </div>
+        <a class="btn btn-sm btn-primary" href="{% url 'case-create' %}?organization={{ organization.pk }}">New case</a>
+      </div>
+      {% if cases %}
+      <div class="table-wrap">
+        <table class="table">
+          <thead><tr><th>Case</th><th>Right</th><th>Status</th><th>Sent</th><th>Deadline</th></tr></thead>
+          <tbody>
+          {% for case in cases %}
+            <tr>
+              <td><a class="link-quiet" href="{{ case.get_absolute_url }}"><strong>{{ case.reference }}</strong></a></td>
+              <td class="small">{{ case.right_label }}</td>
+              <td><span class="badge {{ case.status|badge_class }}">{{ case.get_status_display }}</span></td>
+              <td class="small">{{ case.sent_at|date:"d M Y"|default:"—" }}</td>
+              <td class="small">{% if case.is_overdue %}<span class="badge badge-danger">{{ case.effective_due|date:"d M Y" }}</span>{% elif case.effective_due %}{{ case.effective_due|date:"d M Y" }}{% else %}—{% endif %}</td>
+            </tr>
+          {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      {% else %}
+        <div class="empty"><h3>No cases yet</h3><p>Create a request to start the correspondence trail.</p></div>
+      {% endif %}
+    </div>
+
+    <div class="card">
+      <div class="card-header">
+        <div>
+          <h2 class="card-title">Contacts</h2>
+          <p class="card-subtitle">Privacy team, DPO or postal addresses.</p>
+        </div>
+        <a class="btn btn-sm" href="{% url 'contact-create' organization.pk %}">Add contact</a>
+      </div>
+      {% if organization.contacts.all %}
+      <div class="table-wrap">
+        <table class="table">
+          <thead><tr><th>Role</th><th>Name</th><th>Email</th><th>Source</th><th></th></tr></thead>
+          <tbody>
+          {% for contact in organization.contacts.all %}
+            <tr>
+              <td><span class="badge badge-neutral">{{ contact.get_role_display }}</span></td>
+              <td class="small">{{ contact.name|default:"—" }}</td>
+              <td class="small">{{ contact.email|default:"—" }}</td>
+              <td class="small">{{ contact.source|default:"—" }}</td>
+              <td class="actions-cell">
+                <a class="btn btn-sm" href="{% url 'contact-update' organization.pk contact.pk %}">Edit</a>
+                <form class="inline-form" method="post" action="{% url 'contact-delete' organization.pk contact.pk %}" data-confirm="Delete this contact?">
+                  {% csrf_token %}
+                  <button class="btn btn-sm btn-ghost" type="submit">Delete</button>
+                </form>
+              </td>
+            </tr>
+          {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      {% else %}
+        <div class="empty"><h3>No contacts</h3><p>Add the privacy email or DPO so letters have a recipient.</p></div>
+      {% endif %}
+    </div>
+
+    <div class="card">
+      <div class="card-header">
+        <div>
+          <h2 class="card-title">Data inventory</h2>
+          <p class="card-subtitle">What you believe this organisation holds about you.</p>
+        </div>
+        <a class="btn btn-sm" href="{% url 'inventory-create' organization.pk %}">Add entry</a>
+      </div>
+      {% if organization.inventory.all %}
+      <div class="table-wrap">
+        <table class="table">
+          <thead><tr><th>Service</th><th>Identifier</th><th>Data categories</th><th></th></tr></thead>
+          <tbody>
+          {% for entry in organization.inventory.all %}
+            <tr>
+              <td><strong>{{ entry.service_name }}</strong></td>
+              <td class="small">{{ entry.identifier|default:"—" }}</td>
+              <td class="small">{{ entry.data_categories|linebreaksbr|default:"—" }}</td>
+              <td class="actions-cell">
+                <form class="inline-form" method="post" action="{% url 'inventory-delete' organization.pk entry.pk %}" data-confirm="Delete this inventory entry?">
+                  {% csrf_token %}
+                  <button class="btn btn-sm btn-ghost" type="submit">Delete</button>
+                </form>
+              </td>
+            </tr>
+          {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      {% else %}
+        <div class="empty"><h3>No inventory yet</h3><p>List the accounts or services you use with this organisation.</p></div>
+      {% endif %}
+    </div>
+
+    {% if recent_messages %}
+    <div class="card">
+      <div class="card-header">
+        <h2 class="card-title">Recent messages</h2>
+      </div>
+      <div class="card-body tight">
+        {% for message in recent_messages %}
+          <div class="spread" style="padding:8px 0;border-bottom:1px solid var(--border);">
+            <div>
+              <span class="badge {% if message.messages__direction == 'outbound' %}badge-info{% else %}badge-success{% endif %}">{{ message.messages__direction }}</span>
+              <span class="small">{{ message.messages__subject }}</span>
+              <div class="tiny muted">{{ message.reference }} · {{ message.messages__created_at|date:"d M Y H:i" }}</div>
+            </div>
+            <a class="btn btn-sm" href="{% url 'case-detail' message.pk %}">Open case</a>
+          </div>
+        {% endfor %}
+      </div>
+    </div>
+    {% endif %}
+  </div>
+
+  <div class="stack">
+    <div class="card">
+      <div class="card-header"><h2 class="card-title">Details</h2></div>
+      <div class="card-body">
+        <dl class="meta-list">
+          <dt>Legal name</dt><dd>{{ organization.legal_name|default:"—" }}</dd>
+          <dt>Trading name</dt><dd>{{ organization.trading_name|default:"—" }}</dd>
+          <dt>Country</dt><dd>{{ organization.country|default:"—" }}</dd>
+          <dt>Website</dt><dd>{% if organization.website %}<a href="{{ organization.website }}" target="_blank" rel="noopener">{{ organization.website }}</a>{% else %}—{% endif %}</dd>
+          <dt>Privacy policy</dt><dd>{% if organization.privacy_policy_url %}<a href="{{ organization.privacy_policy_url }}" target="_blank" rel="noopener">Open</a>{% else %}—{% endif %}</dd>
+          <dt>Privacy email</dt><dd>{{ organization.privacy_email|default:"—" }}</dd>
+          <dt>DPO</dt><dd>{{ organization.dpo_name|default:"—" }}{% if organization.dpo_email %}<br>{{ organization.dpo_email }}{% endif %}</dd>
+          <dt>Phone</dt><dd>{{ organization.phone|default:"—" }}</dd>
+          <dt>Address</dt><dd>{{ organization.postal_address|linebreaksbr|default:"—" }}</dd>
+          <dt>Added</dt><dd>{{ organization.created_at|date:"d M Y" }}</dd>
+        </dl>
+      </div>
+    </div>
+
+    {% if organization.notes %}
+    <div class="card">
+      <div class="card-header"><h2 class="card-title">Notes</h2></div>
+      <div class="card-body small">{{ organization.notes|linebreaks }}</div>
+    </div>
+    {% endif %}
+
+    <div class="card">
+      <div class="card-header"><h2 class="card-title">Actions</h2></div>
+      <div class="card-body stack" style="gap:8px;">
+        <a class="btn btn-block" href="{% url 'organization-update' organization.pk %}">Edit company</a>
+        <a class="btn btn-block" href="{% url 'contact-create' organization.pk %}">Add contact</a>
+        <a class="btn btn-block" href="{% url 'inventory-create' organization.pk %}">Add data inventory entry</a>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

@@ -1,0 +1,91 @@
+{% extends "base.html" %}
+{% block title %}Settings · {{ app_name }}{% endblock %}
+{% block content %}
+<div class="page-header">
+  <div>
+    <h1 class="page-title">Settings</h1>
+    <p class="page-subtitle">Your identity, case reference format and local storage paths.</p>
+  </div>
+</div>
+
+<div class="detail-grid">
+  <div class="stack">
+    <div class="card">
+      <div class="card-header">
+        <div>
+          <h2 class="card-title">Your profile</h2>
+          <p class="card-subtitle">Used in every letter and as the data subject in this case file.</p>
+        </div>
+        {% if profile %}<span class="badge badge-success">saved</span>{% else %}<span class="badge badge-warning">not set</span>{% endif %}
+      </div>
+      <form method="post">
+        {% csrf_token %}
+        <input type="hidden" name="form_type" value="profile">
+        <div class="card-body"><div class="form-grid">{% include "partials/form_fields.html" with form=profile_form %}</div></div>
+        <div class="card-footer form-actions">
+          <button class="btn btn-primary" type="submit">Save profile</button>
+        </div>
+      </form>
+    </div>
+
+    <div class="card">
+      <div class="card-header">
+        <div>
+          <h2 class="card-title">Application settings</h2>
+          <p class="card-subtitle">Reference numbering, default letter language and retention.</p>
+        </div>
+      </div>
+      <form method="post">
+        {% csrf_token %}
+        <input type="hidden" name="form_type" value="app">
+        <div class="card-body"><div class="form-grid">{% include "partials/form_fields.html" with form=settings_form %}</div></div>
+        <div class="card-footer form-actions">
+          <button class="btn btn-primary" type="submit">Save settings</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <div class="stack">
+    <div class="card">
+      <div class="card-header"><h2 class="card-title">Local storage</h2></div>
+      <div class="card-body">
+        <dl class="meta-list">
+          <dt>Data directory</dt><dd class="mono tiny">{{ data_dir }}</dd>
+          <dt>Database</dt><dd class="mono tiny">{{ db_path }}</dd>
+          <dt>Media</dt><dd class="mono tiny">{{ media_root }}</dd>
+          <dt>Backups</dt><dd class="mono tiny">{{ backup_dir }}</dd>
+        </dl>
+        <p class="help mt-2 mb-0">In Docker these live under the <span class="kbd">/data</span> volume. Keep that volume on encrypted disk if possible.</p>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-header"><h2 class="card-title">Backups</h2></div>
+      <div class="card-body small">
+        <p class="mt-0">Create an encrypted archive of the database and media:</p>
+        <pre class="message-body" style="font-size:11px;">python manage.py backup</pre>
+        <p>Restore the database and media, then verify:</p>
+        <pre class="message-body" style="font-size:11px;">python manage.py decrypt_backup /data/backups/...
+tar -xzf datasnapper-backup.tar.gz -C /data
+python manage.py migrate
+python manage.py verify_audit</pre>
+        <p class="mb-0"><strong>Important:</strong> keep <span class="kbd">/data/secret.key</span> and <span class="kbd">/data/field.key</span> in a password manager. The field key decrypts identity documents and encrypted backups; without it, those files cannot be recovered.</p>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-header"><h2 class="card-title">Security</h2></div>
+      <div class="card-body small">
+        <ul style="margin:0;padding-left:18px;">
+          <li>Sign in is required for every page.</li>
+          <li>Identity documents are encrypted at rest with the field key.</li>
+          <li>The audit log is hash-chained; run <span class="kbd">verify_audit</span> to check it.</li>
+          <li>Serve over HTTPS if the portal is reachable from outside your LAN.</li>
+          <li>No telemetry and no external calls except the links you click.</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

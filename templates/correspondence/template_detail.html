@@ -1,0 +1,100 @@
+{% extends "base.html" %}
+{% load ds_tags %}
+{% block title %}{{ template.name }} · {{ app_name }}{% endblock %}
+{% block content %}
+<div class="breadcrumb"><a href="{% url 'template-list' %}">Templates</a> / {{ template.name }}</div>
+<div class="page-header">
+  <div>
+    <h1 class="page-title">{{ template.name }}</h1>
+    <p class="page-subtitle">
+      {{ template.right|right_label }} · {{ template.get_locale_display }} · version {{ template.version }}
+      {% if template.is_active %}<span class="badge badge-success">active</span>{% else %}<span class="badge badge-neutral">archived</span>{% endif %}
+    </p>
+  </div>
+  <div class="actions">
+    <a class="btn" href="{% url 'template-list' %}">All templates</a>
+    <a class="btn btn-primary" href="{% url 'template-edit' template.pk %}">Create new version</a>
+  </div>
+</div>
+
+<div class="detail-grid">
+  <div class="stack">
+    <div class="card">
+      <div class="card-header">
+        <div>
+          <h2 class="card-title">Subject</h2>
+          <p class="card-subtitle">Rendered with the case and profile variables.</p>
+        </div>
+      </div>
+      <div class="card-body"><strong>{{ template.subject }}</strong></div>
+    </div>
+
+    <div class="card">
+      <div class="card-header">
+        <div>
+          <h2 class="card-title">Body</h2>
+          <p class="card-subtitle">Plain text with Django template variables.</p>
+        </div>
+      </div>
+      <div class="card-body">
+        <pre class="message-body">{{ template.body }}</pre>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-header"><h2 class="card-title">Versions</h2></div>
+      <div class="table-wrap">
+        <table class="table">
+          <thead><tr><th>Version</th><th>State</th><th>Updated</th><th></th></tr></thead>
+          <tbody>
+          {% for version in versions %}
+            <tr>
+              <td>v{{ version.version }}</td>
+              <td>{% if version.is_active %}<span class="badge badge-success">active</span>{% else %}<span class="badge badge-neutral">archived</span>{% endif %}</td>
+              <td class="small">{{ version.updated_at|date:"d M Y H:i" }}</td>
+              <td class="actions-cell"><a class="btn btn-sm" href="{{ version.get_absolute_url }}">Open</a></td>
+            </tr>
+          {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <div class="stack">
+    <div class="card">
+      <div class="card-header"><h2 class="card-title">Details</h2></div>
+      <div class="card-body">
+        <dl class="meta-list">
+          <dt>Slug</dt><dd class="mono">{{ template.slug }}</dd>
+          <dt>Request</dt><dd>{{ template.right|right_label }}</dd>
+          <dt>Language</dt><dd>{{ template.get_locale_display }}</dd>
+          <dt>Jurisdiction</dt><dd>{{ template.jurisdiction }}</dd>
+          <dt>Legal refs</dt><dd>{{ template.legal_refs|default:"—" }}</dd>
+          <dt>Version</dt><dd>v{{ template.version }}</dd>
+          <dt>Created</dt><dd>{{ template.created_at|date:"d M Y H:i" }}</dd>
+          <dt>Updated</dt><dd>{{ template.updated_at|date:"d M Y H:i" }}</dd>
+        </dl>
+        {% if template.notes %}
+          <div class="divider"></div>
+          <div class="small">{{ template.notes|linebreaks }}</div>
+        {% endif %}
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-header"><h2 class="card-title">Variables</h2></div>
+      <div class="card-body">
+        <div class="row">
+          {% for variable in template.variables %}
+            <span class="pill mono">{{ variable }}</span>
+          {% empty %}
+            <span class="small muted">No variables in this template.</span>
+          {% endfor %}
+        </div>
+        <p class="help mt-2 mb-0">Available roots: profile, organization, contact, case, today, due_date, signature, extra_note.</p>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

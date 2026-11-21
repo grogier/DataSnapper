@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>{{ message.subject }}</title>
+  <style>
+    @page { size: A4; margin: 22mm 20mm 20mm; }
+    * { box-sizing: border-box; }
+    body {
+      font-family: Georgia, "Times New Roman", serif;
+      font-size: 11pt; line-height: 1.55; color: #111;
+      margin: 0;
+    }
+    .sender { font-size: 9.5pt; line-height: 1.45; color: #333; }
+    .date { text-align: right; font-size: 10pt; color: #333; }
+    .recipient { margin-top: 12mm; font-size: 10.5pt; line-height: 1.5; }
+    .subject { margin-top: 10mm; font-weight: bold; font-size: 11pt; }
+    .body { margin-top: 6mm; }
+    .body p { margin: 0 0 3.2mm; }
+    .footer {
+      margin-top: 12mm; padding-top: 3mm; border-top: 0.5pt solid #bbb;
+      font-size: 8pt; color: #666;
+    }
+  </style>
+</head>
+<body>
+  <table style="width:100%;border-collapse:collapse;">
+    <tr>
+      <td style="vertical-align:top;">
+        <div class="sender">
+          <strong>{{ profile.full_name }}</strong><br>
+          {{ profile.postal_address|linebreaksbr }}<br>
+          {{ profile.email }}<br>
+          {{ profile.phone }}
+        </div>
+      </td>
+      <td style="vertical-align:top;text-align:right;">
+        <div class="date">{{ today|date:"j F Y" }}</div>
+      </td>
+    </tr>
+  </table>
+
+  <div class="recipient">
+    <strong>{{ organization.name }}</strong><br>
+    {% if contact.name %}{{ contact.name }}<br>{% endif %}
+    {% if contact.email %}{{ contact.email }}<br>{% endif %}
+    {{ organization.postal_address|linebreaksbr }}
+  </div>
+
+  <div class="subject">{{ message.subject }}</div>
+  <div class="body">{{ message.body|linebreaks }}</div>
+
+  <div class="footer">
+    Reference: {{ case.reference }} · {{ case.right_label }}{% if case.organization.legal_name %} · {{ case.organization.legal_name }}{% endif %}
+  </div>
+</body>
+</html>

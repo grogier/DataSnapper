@@ -1,0 +1,107 @@
+{% extends "base.html" %}
+{% load ds_tags %}
+{% block title %}Search · {{ app_name }}{% endblock %}
+{% block content %}
+<div class="page-header">
+  <div>
+    <h1 class="page-title">Search</h1>
+    <p class="page-subtitle">{% if query %}Results for “{{ query }}”.{% else %}Search across companies, cases, messages and documents.{% endif %}</p>
+  </div>
+</div>
+
+<div class="card">
+  <div class="card-body tight">
+    <form method="get" class="row" style="gap:8px;">
+      <input class="input" style="max-width:420px;" type="search" name="q" value="{{ query }}" placeholder="At least two characters" autofocus>
+      <button class="btn btn-primary" type="submit">Search</button>
+    </form>
+  </div>
+</div>
+
+{% if query and query|length < 2 %}
+  <div class="flash warning mt-2">Enter at least two characters.</div>
+{% elif query %}
+  <div class="detail-grid mt-2">
+    <div class="stack">
+      <div class="card">
+        <div class="card-header"><h2 class="card-title">Cases</h2><span class="pill">{{ cases|length }}</span></div>
+        {% if cases %}
+        <div class="table-wrap">
+          <table class="table">
+            <thead><tr><th>Reference</th><th>Company</th><th>Request</th><th>Status</th></tr></thead>
+            <tbody>
+            {% for case in cases %}
+              <tr>
+                <td><a class="link-quiet" href="{{ case.get_absolute_url }}"><strong>{{ case.reference }}</strong></a></td>
+                <td class="small">{{ case.organization.name }}</td>
+                <td class="small">{{ case.right_label }}</td>
+                <td><span class="badge {{ case.status|badge_class }}">{{ case.get_status_display }}</span></td>
+              </tr>
+            {% endfor %}
+            </tbody>
+          </table>
+        </div>
+        {% else %}<div class="empty"><p>No matching cases.</p></div>{% endif %}
+      </div>
+
+      <div class="card">
+        <div class="card-header"><h2 class="card-title">Messages</h2><span class="pill">{{ messages_found|length }}</span></div>
+        {% if messages_found %}
+        <div class="table-wrap">
+          <table class="table">
+            <thead><tr><th>Subject</th><th>Case</th><th>Direction</th><th>Created</th></tr></thead>
+            <tbody>
+            {% for message in messages_found %}
+              <tr>
+                <td><a class="link-quiet" href="{% url 'message-detail' message.case.pk message.pk %}">{{ message.subject }}</a></td>
+                <td class="small">{{ message.case.reference }}</td>
+                <td class="small">{{ message.get_direction_display }}</td>
+                <td class="small">{{ message.created_at|date:"d M Y" }}</td>
+              </tr>
+            {% endfor %}
+            </tbody>
+          </table>
+        </div>
+        {% else %}<div class="empty"><p>No matching messages.</p></div>{% endif %}
+      </div>
+
+      <div class="card">
+        <div class="card-header"><h2 class="card-title">Documents</h2><span class="pill">{{ attachments|length }}</span></div>
+        {% if attachments %}
+        <div class="table-wrap">
+          <table class="table">
+            <thead><tr><th>Document</th><th>Case</th><th>Kind</th><th>Added</th></tr></thead>
+            <tbody>
+            {% for attachment in attachments %}
+              <tr>
+                <td><a class="link-quiet" href="{% url 'attachment-download' attachment.pk %}">{{ attachment.original_name }}</a></td>
+                <td class="small">{% if attachment.case %}{{ attachment.case.reference }}{% else %}—{% endif %}</td>
+                <td class="small">{{ attachment.get_kind_display }}</td>
+                <td class="small">{{ attachment.created_at|date:"d M Y" }}</td>
+              </tr>
+            {% endfor %}
+            </tbody>
+          </table>
+        </div>
+        {% else %}<div class="empty"><p>No matching documents.</p></div>{% endif %}
+      </div>
+    </div>
+
+    <div class="stack">
+      <div class="card">
+        <div class="card-header"><h2 class="card-title">Companies</h2><span class="pill">{{ organizations|length }}</span></div>
+        {% if organizations %}
+        <div class="card-body tight">
+          {% for organization in organizations %}
+            <div style="padding:8px 0;border-bottom:1px solid var(--border);">
+              <a class="link-quiet" href="{{ organization.get_absolute_url }}"><strong>{{ organization.name }}</strong></a>
+              <div class="tiny muted">{{ organization.get_category_display }} · {{ organization.best_email|default:"no contact" }}</div>
+            </div>
+          {% endfor %}
+        </div>
+        {% else %}<div class="empty"><p>No matching companies.</p></div>{% endif %}
+      </div>
+    </div>
+  </div>
+{% endif %}
+{% endblock %}

@@ -1,0 +1,23 @@
+{% extends "base.html" %}
+{% block title %}Delete {{ organization.name }} · {{ app_name }}{% endblock %}
+{% block content %}
+<div class="page-header">
+  <div>
+    <h1 class="page-title">Delete company</h1>
+    <p class="page-subtitle">This cannot be undone.</p>
+  </div>
+</div>
+<div class="card">
+  <div class="card-body">
+    <p>Delete <strong>{{ organization.name }}</strong> and its contacts and data inventory?</p>
+    <p class="small muted">Cases are protected. If this company has cases, move or close them first.</p>
+  </div>
+  <div class="card-footer form-actions">
+    <form method="post">
+      {% csrf_token %}
+      <button class="btn btn-danger" type="submit">Delete company</button>
+    </form>
+    <a class="btn" href="{{ organization.get_absolute_url }}">Cancel</a>
+  </div>
+</div>
+{% endblock %}
