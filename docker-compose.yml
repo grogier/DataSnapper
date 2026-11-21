@@ -74,7 +74,9 @@ services:
       OPENAI_API_KEY: ${OPENAI_API_KEY:-}
       LLM_API_KEY: ${LLM_API_KEY:-}
     volumes:
-      - ./data:/data
+      # Database, media, backups and generated keys live in a named volume so
+      # they never depend on a path on the host.
+      - datasnapper_data:/data
     ports:
       - "8080:8000"
     extra_hosts:
@@ -92,7 +94,7 @@ services:
   # Then pull a model once:
   #   docker compose exec ollama ollama pull llama3.1:8b
   # and set LLM_BASE_URL=http://ollama:11434 for the app.
-  # Also uncomment the ollama volume at the bottom of this file.
+  # Also uncomment the ollama volume key at the bottom of this file.
   # ollama:
   #   image: ollama/ollama
   #   profiles: ["llm"]
@@ -117,8 +119,14 @@ services:
   #     - "80:80"
   #     - "443:443"
   #   restart: unless-stopped
-  #
-  # volumes:
-  #   caddy_data:
-  #   caddy_config:
-  #   ollama:
+
+volumes:
+  # Fixed name so the data survives deploy tools that rename the Compose
+  # project, and so backup/restore commands can use `datasnapper_data`.
+  datasnapper_data:
+    name: datasnapper_data
+
+  # Uncomment these when enabling the optional services above.
+  # caddy_data:
+  # caddy_config:
+  # ollama:

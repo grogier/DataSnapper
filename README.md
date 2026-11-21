@@ -56,8 +56,8 @@ This uses the prebuilt image from
 `ghcr.io/grogier/datasnapper:latest`; nothing is compiled locally. It works
 without any configuration file. The compose file passes local defaults
 (`DEBUG=0`, `ADMIN_USERNAME=admin`, permissive `ALLOWED_HOSTS`) and generates
-the secret keys in `./data` on first start. If `ADMIN_PASSWORD` is not set, a
-password is generated and printed once:
+the secret keys in the `datasnapper_data` volume on first start. If
+`ADMIN_PASSWORD` is not set, a password is generated and printed once:
 
 ```bash
 docker compose logs app | grep -A2 "Generated password"
@@ -83,9 +83,39 @@ outside your own network.
 On the first start the container runs migrations, creates the admin user, seeds
 the 20 letter templates, and then starts Gunicorn.
 
-The compose file bind-mounts `./data` to `/data` inside the container, so the
-database, media and backups survive container upgrades. Keep that directory on
-an encrypted disk if possible.
+The compose file keeps the database, media, backups and generated keys in the
+named volume `datasnapper_data`, mounted at `/data` in the container. The volume
+survives container upgrades and does not depend on a directory on the host.
+Keep the Docker host's disk encrypted if possible.
+
+`docker compose down` keeps the volume. Do not use `docker compose down -v`
+unless you intend to erase the case file.
+
+To copy data out of the container:
+
+```bash
+# latest encrypted backups
+docker compose cp app:/data/backups ./backups
+
+# full snapshot of the volume
+docker run --rm -v datasnapper_data:/data:ro -v "$PWD:/backup" alpine \
+  tar czf /backup/datasnapper-data.tgz -C /data .
+```
+
+### Moving an existing `./data` folder into the volume
+
+Earlier releases bind-mounted `./data`. To keep that data, copy it once:
+
+```bash
+docker compose down
+docker volume create datasnapper_data
+docker run --rm -v "$PWD/data:/from:ro" -v datasnapper_data:/to \
+  alpine sh -c 'cp -a /from/. /to/'
+docker compose up -d
+```
+
+The container fixes ownership on start. Keep `./data` until you have verified
+the new volume, then delete it.
 
 Useful commands:
 
@@ -149,7 +179,7 @@ Compose. See `.env.example` for the full list.
 | `DEBUG` | `1` locally, `0` in Docker | Debug mode. Keep `0` in production. |
 | `ALLOWED_HOSTS` | `*` in Docker, `localhost,127.0.0.1` locally | Comma-separated hostnames. Narrow it when exposing the portal. |
 | `CSRF_TRUSTED_ORIGINS` | empty | Required for HTTPS origins, e.g. `https://cases.example.com`. |
-| `DATA_DIR` | `./data` locally, `/data` in Docker | Database, media, backups and generated keys. |
+| `DATA_DIR` | `./data` locally, `/data` in Docker | Database, media, backups and generated keys. Docker Compose maps it to the `datasnapper_data` volume. |
 | `DATABASE_PATH` | `$DATA_DIR/db/datasnapper.sqlite3` | Override the SQLite file. |
 | `MEDIA_ROOT` | `$DATA_DIR/media` | Uploaded documents. |
 | `BACKUP_DIR` | `$DATA_DIR/backups` | Backup archives. |
