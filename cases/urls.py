@@ -15,6 +15,22 @@ urlpatterns = [
     path("<int:pk>/tasks/<int:task_pk>/toggle/", views.task_toggle, name="task-toggle"),
     path("<int:pk>/checklist/toggle/", views.checklist_toggle, name="checklist-toggle"),
     path("<int:pk>/compose/", correspondence_views.compose, name="case-compose"),
+    path(
+        "<int:pk>/ai/generate/",
+        correspondence_views.case_ai_generate,
+        name="case-ai-generate",
+    ),
+    path(
+        "<int:pk>/ai/prompt/",
+        correspondence_views.case_ai_prompt,
+        name="case-ai-prompt",
+    ),
+    path("<int:pk>/ai/save/", correspondence_views.case_ai_save, name="case-ai-save"),
+    path(
+        "<int:pk>/ai/scope/",
+        correspondence_views.case_ai_apply_scope,
+        name="case-ai-apply-scope",
+    ),
     path("<int:pk>/reply/", correspondence_views.reply, name="case-reply"),
     path(
         "<int:pk>/attachments/upload/",

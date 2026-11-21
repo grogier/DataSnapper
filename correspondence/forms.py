@@ -9,7 +9,7 @@ from correspondence.models import Attachment, Message, Template
 
 
 class ComposeForm(StyledFormMixin, forms.Form):
-    template = forms.ModelChoiceField(queryset=Template.objects.none())
+    template = forms.ModelChoiceField(queryset=Template.objects.none(), required=False)
     to_address = forms.CharField(required=False, max_length=320)
     scope = forms.CharField(required=False, widget=forms.Textarea(attrs={"rows": 3}))
     extra_note = forms.CharField(
@@ -24,6 +24,7 @@ class ComposeForm(StyledFormMixin, forms.Form):
         self.fields["template"].queryset = Template.objects.filter(
             right=case.right, is_active=True
         ).order_by("locale", "name", "-version")
+        self.fields["template"].empty_label = "Choose a template (optional)"
         self.fields["to_address"].initial = case.organization.best_email
         self.fields["scope"].initial = case.scope
 

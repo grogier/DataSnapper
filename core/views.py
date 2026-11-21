@@ -11,12 +11,15 @@ from django.db.models import Q
 from django.http import HttpResponse, JsonResponse
 from django.shortcuts import redirect, render
 from django.utils import timezone
+from django.views.decorators.http import require_POST
 
 from audit.models import AuditLog
 from audit.services import log
 from cases.models import Case, CaseEvent, Task
 from companies.models import Organization
-from core.forms import AppSettingsForm, DataSubjectForm
+from core import llm
+from core.forms import AppSettingsForm, DataSubjectForm, LLMSettingsForm
+from core.llm.providers import PROVIDERS
 from core.models import AppSettings, DataSubject
 from core.utils import MONTHS
 from correspondence.models import Attachment
@@ -118,6 +121,7 @@ def settings_view(request):
     app_settings = AppSettings.load()
     profile_form = DataSubjectForm(instance=profile)
     settings_form = AppSettingsForm(instance=app_settings)
+    llm_form = LLMSettingsForm(instance=app_settings)
 
     if request.method == "POST":
         form_type = request.POST.get("form_type", "")
@@ -152,6 +156,24 @@ def settings_view(request):
                 )
                 messages.success(request, "Settings saved.")
                 return redirect("settings")
+        elif form_type == "llm":
+            llm_form = LLMSettingsForm(request.POST, instance=app_settings)
+            if llm_form.is_valid():
+                llm_form.save()
+                log(
+                    actor=request.user,
+                    action="settings.llm",
+                    entity_type="app_settings",
+                    entity_id=str(app_settings.pk),
+                    summary="Updated AI assistance settings",
+                    metadata={
+                        "provider": app_settings.llm_provider,
+                        "enabled": app_settings.llm_enabled,
+                    },
+                    request=request,
+                )
+                messages.success(request, "AI settings saved.")
+                return redirect("settings")
         else:
             messages.error(request, "Unknown form submitted.")
 
@@ -162,12 +184,54 @@ def settings_view(request):
             "profile": profile,
             "profile_form": profile_form,
             "settings_form": settings_form,
+            "llm_form": llm_form,
+            "llm_status": llm.settings_status(app_settings),
+            "llm_presets": {
+                key: {
+                    "base_url": spec.default_base_url,
+                    "model": spec.default_model,
+                    "thinking": spec.supports_thinking,
+                }
+                for key, spec in PROVIDERS.items()
+            },
             "data_dir": settings.DATA_DIR,
             "db_path": settings.DATABASES["default"]["NAME"],
             "media_root": settings.MEDIA_ROOT,
             "backup_dir": settings.BACKUP_DIR,
         },
     )
+
+
+@login_required
+@require_POST
+def settings_llm_test(request):
+    try:
+        result = llm.test_connection(llm.resolve_config())
+    except llm.LLMError as exc:
+        log(
+            actor=request.user,
+            action="settings.llm_test",
+            entity_type="app_settings",
+            entity_id="1",
+            summary="AI connection test failed",
+            metadata={"error": exc.__class__.__name__},
+            request=request,
+        )
+        return render(
+            request,
+            "core/_llm_status.html",
+            {"ok": False, "error": str(exc)},
+        )
+    log(
+        actor=request.user,
+        action="settings.llm_test",
+        entity_type="app_settings",
+        entity_id="1",
+        summary="AI connection test succeeded",
+        metadata={"provider": result["provider"], "model": result["model"]},
+        request=request,
+    )
+    return render(request, "core/_llm_status.html", {"ok": True, "result": result})
 
 
 @login_required

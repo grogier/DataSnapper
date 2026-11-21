@@ -15,6 +15,7 @@
 
 <div class="detail-grid">
   <div class="stack">
+    {% if ai_templates %}
     <div class="card">
       <div class="card-header">
         <div>
@@ -36,6 +37,18 @@
         </div>
       </form>
     </div>
+    {% else %}
+    <div class="card">
+      <div class="card-body">
+        <div class="flash info mb-0">
+          No active template exists for this request type. Use AI assistance below, or add a
+          template first.
+        </div>
+      </div>
+    </div>
+    {% endif %}
+
+    {% include "correspondence/_ai_panel.html" %}
 
     {% if preview %}
     <div class="card">

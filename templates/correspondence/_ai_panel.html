@@ -1,0 +1,125 @@
+{% if llm.enabled %}
+<div class="card">
+  <div class="card-header">
+    <div>
+      <h2 class="card-title">AI assistance</h2>
+      <p class="card-subtitle">Let the model describe the request or draft the whole letter. Review everything first.</p>
+    </div>
+    <span class="badge {% if llm.is_cloud %}badge-warning{% else %}badge-success{% endif %}">
+      {{ llm.provider }}
+    </span>
+  </div>
+  <form id="ai-form"
+        hx-post="{% url 'case-ai-generate' case.pk %}"
+        hx-target="#ai-result" hx-swap="innerHTML"
+        hx-indicator="#ai-spinner">
+    {% csrf_token %}
+    <div class="card-body">
+      {% if llm.key_required and not llm.key_configured %}
+        <div class="flash warning">
+          No API key is configured. Add <span class="kbd">{{ llm.key_env_name }}</span> to your
+          environment and restart. Local Ollama does not need a key.
+        </div>
+      {% endif %}
+      {% if llm.is_cloud %}
+        <div class="flash warning">
+          Requests go to <span class="mono tiny">{{ llm.base_url }}</span>, outside this machine.
+          The case file itself stays local.
+        </div>
+      {% endif %}
+
+      <div class="form-grid">
+        <div class="field">
+          <label class="label" for="ai-mode">Task</label>
+          <select class="select" id="ai-mode" name="mode">
+            <option value="draft">Draft the full letter</option>
+            <option value="scope">Describe the request (scope)</option>
+            <option value="rewrite">Rewrite existing text</option>
+          </select>
+        </div>
+        <div class="field">
+          <label class="label" for="ai-template">Base template</label>
+          <select class="select" id="ai-template" name="template">
+            <option value="">None / free text</option>
+            {% for tmpl in ai_templates %}
+              <option value="{{ tmpl.pk }}">{{ tmpl.name }} ({{ tmpl.locale|upper }})</option>
+            {% endfor %}
+          </select>
+          <div class="help">Used for style and language. Optional.</div>
+        </div>
+        <div class="field">
+          <label class="label" for="ai-tone">Tone</label>
+          <select class="select" id="ai-tone" name="tone">
+            <option value="neutral">Neutral</option>
+            <option value="firm">Firm</option>
+          </select>
+        </div>
+        <div class="field">
+          <label class="label" for="ai-length">Length</label>
+          <select class="select" id="ai-length" name="length">
+            <option value="concise">Concise</option>
+            <option value="thorough">Thorough</option>
+          </select>
+        </div>
+        <div class="field full">
+          <label class="label" for="ai-instructions">Extra instructions</label>
+          <textarea class="textarea" id="ai-instructions" name="instructions" rows="3"
+                    placeholder="Example: mention my old account and the marketing emails I still receive."></textarea>
+        </div>
+        <div class="field full">
+          <label class="label" for="ai-existing">Existing text to rewrite</label>
+          <textarea class="textarea" id="ai-existing" name="existing_body" rows="5"
+                    placeholder="Only used for the Rewrite task."></textarea>
+          <div class="help">
+            If you choose a template above, its raw text is used instead of this box.
+            Pasted text is sent as written, so do not add personal data you want to keep local.
+          </div>
+        </div>
+      </div>
+
+      <fieldset class="mt-2">
+        <legend>Points to emphasise</legend>
+        <div class="grid grid-2">
+          {% for item in checklist_items %}
+            <label class="checkbox-row">
+              <input class="checkbox" type="checkbox" name="checklist" value="{{ item.key }}">
+              <span class="label">{{ item.label }}</span>
+            </label>
+          {% endfor %}
+        </div>
+        <div class="help mt-1">Leave all unchecked to cover the complete checklist.</div>
+      </fieldset>
+
+      {% if llm.supports_thinking %}
+        <label class="checkbox-row mt-2">
+          <input class="checkbox" type="checkbox" name="reasoning" {% if llm.reasoning %}checked{% endif %}>
+          <span class="label">Reasoning mode (slower, better for complex requests)</span>
+        </label>
+      {% endif %}
+
+      <p class="help mt-2 mb-0">
+        {% if llm.share_personal_data %}
+          Personal-data sharing is on: the model sees your name, address and contact details.
+        {% else %}
+          Personal-data sharing is off: the model only sees the case facts, your notes and
+          placeholders. Your name, address and contact details are filled in locally.
+        {% endif %}
+      </p>
+    </div>
+    <div class="card-footer form-actions">
+      <button class="btn btn-primary" type="submit">Generate</button>
+      <button class="btn" type="button"
+              hx-post="{% url 'case-ai-prompt' case.pk %}"
+              hx-include="closest form"
+              hx-target="#ai-prompt" hx-swap="innerHTML">
+        Show prompt
+      </button>
+      <span id="ai-spinner" class="spinner htmx-indicator"></span>
+    </div>
+  </form>
+  <div class="card-body">
+    <div id="ai-result"></div>
+    <div id="ai-prompt" class="mt-2"></div>
+  </div>
+</div>
+{% endif %}

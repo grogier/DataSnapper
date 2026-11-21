@@ -13,8 +13,10 @@ from django.views.decorators.http import require_POST
 from audit.services import log
 from cases.models import Case
 from cases.rights import RIGHT_CHOICES
-from core.models import DataSubject
+from core import llm
+from core.models import AppSettings, DataSubject
 from core.utils import decrypt_bytes
+from correspondence import assist
 from correspondence.forms import (
     AttachmentForm,
     ComposeForm,
@@ -162,7 +164,12 @@ def compose(request, pk):
     if profile is None:
         messages.warning(request, "Add your own profile in Settings before composing a letter.")
         return redirect("settings")
-    if not Template.objects.filter(right=case.right, is_active=True).exists():
+
+    llm_settings = assist.ai_context(case)
+    ai_templates = Template.objects.filter(right=case.right, is_active=True).order_by(
+        "locale", "name", "-version"
+    )
+    if not ai_templates and not llm_settings["enabled"]:
         messages.warning(request, "No active template exists for this request type. Add one first.")
         return redirect(case)
 
@@ -170,34 +177,37 @@ def compose(request, pk):
     preview = None
     action = request.POST.get("action", "")
 
-    if request.method == "POST" and form.is_valid():
+    if request.method == "POST" and form.is_valid() and action in {"preview", "save"}:
         template = form.cleaned_data["template"]
-        context = build_letter_context(
-            case,
-            template,
-            scope=form.cleaned_data["scope"],
-            extra_note=form.cleaned_data["extra_note"],
-        )
-        missing = missing_for_template(template, context)
-        if action == "save":
-            message = create_draft_message(
+        if template is None:
+            form.add_error("template", "Choose a template, or use AI assistance below.")
+        else:
+            context = build_letter_context(
                 case,
                 template,
                 scope=form.cleaned_data["scope"],
                 extra_note=form.cleaned_data["extra_note"],
-                to_address=form.cleaned_data["to_address"],
-                actor=request.user,
-                request=request,
             )
-            messages.success(request, "Draft saved. Review it, then export or mark it as sent.")
-            return redirect("message-detail", pk=case.pk, message_pk=message.pk)
-        subject, body = template.render(context)
-        preview = {
-            "template": template,
-            "subject": subject,
-            "body": body,
-            "missing": missing,
-        }
+            missing = missing_for_template(template, context)
+            if action == "save":
+                message = create_draft_message(
+                    case,
+                    template,
+                    scope=form.cleaned_data["scope"],
+                    extra_note=form.cleaned_data["extra_note"],
+                    to_address=form.cleaned_data["to_address"],
+                    actor=request.user,
+                    request=request,
+                )
+                messages.success(request, "Draft saved. Review it, then export or mark it as sent.")
+                return redirect("message-detail", pk=case.pk, message_pk=message.pk)
+            subject, body = template.render(context)
+            preview = {
+                "template": template,
+                "subject": subject,
+                "body": body,
+                "missing": missing,
+            }
 
     return render(
         request,
@@ -208,8 +218,213 @@ def compose(request, pk):
             "preview": preview,
             "profile": profile,
             "pdf_available": pdf_available(),
+            "llm": llm_settings,
+            "ai_templates": ai_templates,
+            "checklist_items": case.checklist_items,
         },
     )
+
+
+def _selected_ai_template(case: Case, request) -> Template | None:
+    template_id = request.POST.get("template", "")
+    if not template_id:
+        return None
+    try:
+        return Template.objects.filter(pk=template_id, right=case.right, is_active=True).first()
+    except (TypeError, ValueError):
+        return None
+
+
+def _ai_inputs(request, case: Case) -> tuple[dict | None, str]:
+    mode = request.POST.get("mode", "draft")
+    if mode not in assist.MODES:
+        mode = "draft"
+    template = _selected_ai_template(case, request)
+    locale = template.locale if template else AppSettings.load().default_locale
+    tone = request.POST.get("tone", "neutral")
+    if tone not in {"neutral", "firm"}:
+        tone = "neutral"
+    length = request.POST.get("length", "concise")
+    if length not in {"concise", "thorough"}:
+        length = "concise"
+
+    existing_subject = request.POST.get("existing_subject", "")
+    existing_body = request.POST.get("existing_body", "")
+    message_pk = request.POST.get("message_pk", "")
+    if mode == "rewrite":
+        if message_pk:
+            try:
+                message = Message.objects.filter(pk=message_pk, case=case).first()
+            except (TypeError, ValueError):
+                message = None
+            if message is None:
+                return None, "That message does not belong to this case."
+            if not llm.resolve_config().share_personal_data:
+                return None, (
+                    "Enable 'Share personal data with the LLM' in Settings before rewriting "
+                    "a rendered message. A template body with placeholders is safe to rewrite."
+                )
+            existing_subject = message.subject
+            existing_body = message.body
+        elif not existing_body.strip() and template is not None:
+            existing_subject = template.subject
+            existing_body = template.body
+        if not existing_body.strip():
+            return None, "Paste the text you want to rewrite, or choose a template."
+
+    return (
+        {
+            "mode": mode,
+            "template": template,
+            "locale": locale,
+            "tone": tone,
+            "length": length,
+            "instructions": request.POST.get("instructions", ""),
+            "checklist_keys": request.POST.getlist("checklist"),
+            "existing_subject": existing_subject,
+            "existing_body": existing_body,
+            "reasoning": bool(request.POST.get("reasoning")),
+        },
+        "",
+    )
+
+
+@login_required
+@require_POST
+def case_ai_generate(request, pk):
+    case = get_object_or_404(Case.objects.select_related("organization"), pk=pk)
+    context = assist.ai_context(case)
+    if not context["enabled"]:
+        return render(
+            request,
+            "correspondence/_ai_result.html",
+            {
+                "case": case,
+                "error": "AI assistance is disabled. Enable it in Settings first.",
+                "llm": context,
+            },
+        )
+    inputs, error = _ai_inputs(request, case)
+    if error:
+        return render(
+            request,
+            "correspondence/_ai_result.html",
+            {"case": case, "error": error, "llm": assist.ai_context(case)},
+        )
+    template = inputs.pop("template")
+    try:
+        assist_result, llm_result, _bundle = assist.generate_assist(
+            case,
+            actor=request.user,
+            request=request,
+            **inputs,
+        )
+    except llm.LLMError as exc:
+        return render(
+            request,
+            "correspondence/_ai_result.html",
+            {
+                "case": case,
+                "error": str(exc),
+                "mode": inputs["mode"],
+                "llm": assist.ai_context(case),
+            },
+        )
+    return render(
+        request,
+        "correspondence/_ai_result.html",
+        {
+            "case": case,
+            "result": assist_result,
+            "meta": llm_result,
+            "mode": inputs["mode"],
+            "template": template,
+            "llm": assist.ai_context(case),
+        },
+    )
+
+
+@login_required
+@require_POST
+def case_ai_prompt(request, pk):
+    case = get_object_or_404(Case.objects.select_related("organization"), pk=pk)
+    inputs, error = _ai_inputs(request, case)
+    if error:
+        return render(
+            request,
+            "correspondence/_ai_prompt.html",
+            {"case": case, "error": error, "llm": assist.ai_context(case)},
+        )
+    bundle = assist.build_prompt(
+        case,
+        mode=inputs["mode"],
+        locale=inputs["locale"],
+        tone=inputs["tone"],
+        length=inputs["length"],
+        instructions=inputs["instructions"],
+        checklist_keys=inputs["checklist_keys"],
+        include_personal=llm.resolve_config().share_personal_data,
+        existing_subject=inputs["existing_subject"],
+        existing_body=inputs["existing_body"],
+    )
+    return render(
+        request,
+        "correspondence/_ai_prompt.html",
+        {"case": case, "bundle": bundle, "llm": assist.ai_context(case)},
+    )
+
+
+@login_required
+@require_POST
+def case_ai_save(request, pk):
+    case = get_object_or_404(Case.objects.select_related("organization"), pk=pk)
+    subject = request.POST.get("subject", "").strip()
+    body = request.POST.get("body", "").strip()
+    if not subject or not body:
+        messages.error(request, "The AI draft is empty. Generate it again.")
+        return redirect("case-compose", pk=case.pk)
+    if len(body) > assist.MAX_OUTPUT_CHARS:
+        messages.error(request, "The AI draft is too long.")
+        return redirect("case-compose", pk=case.pk)
+    template = _selected_ai_template(case, request)
+    locale = template.locale if template else AppSettings.load().default_locale
+    config = llm.resolve_config()
+    try:
+        message = assist.create_ai_draft(
+            case,
+            subject=subject,
+            body=body,
+            provider=config.provider,
+            model=config.model,
+            to_address=request.POST.get("to_address", ""),
+            template=template,
+            locale=locale,
+            actor=request.user,
+            request=request,
+        )
+    except ValueError as exc:
+        messages.error(request, str(exc))
+        return redirect("case-compose", pk=case.pk)
+    messages.success(request, "AI-assisted draft saved. Review it before sending.")
+    return redirect("message-detail", pk=case.pk, message_pk=message.pk)
+
+
+@login_required
+@require_POST
+def case_ai_apply_scope(request, pk):
+    case = get_object_or_404(Case.objects.select_related("organization"), pk=pk)
+    try:
+        assist.apply_ai_scope(
+            case,
+            request.POST.get("scope", ""),
+            actor=request.user,
+            request=request,
+        )
+    except ValueError as exc:
+        messages.error(request, str(exc))
+    else:
+        messages.success(request, "Scope updated with AI assistance.")
+    return redirect(case)
 
 
 @login_required

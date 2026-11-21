@@ -11,4 +11,11 @@ class DataSubjectAdmin(admin.ModelAdmin):
 
 @admin.register(AppSettings)
 class AppSettingsAdmin(admin.ModelAdmin):
-    list_display = ("case_prefix", "default_locale", "reminder_days", "retention_days")
+    list_display = (
+        "case_prefix",
+        "default_locale",
+        "reminder_days",
+        "retention_days",
+        "llm_enabled",
+        "llm_provider",
+    )

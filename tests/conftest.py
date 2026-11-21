@@ -23,6 +23,25 @@ def isolated_storage(tmp_path, settings):
     yield
 
 
+@pytest.fixture(autouse=True)
+def isolated_llm_env(monkeypatch):
+    for name in (
+        "LLM_ENABLED",
+        "LLM_PROVIDER",
+        "LLM_BASE_URL",
+        "LLM_MODEL",
+        "LLM_TIMEOUT",
+        "LLM_MAX_OUTPUT_TOKENS",
+        "LLM_REASONING",
+        "LLM_SHARE_PERSONAL_DATA",
+        "DEEPSEEK_API_KEY",
+        "OPENAI_API_KEY",
+        "LLM_API_KEY",
+    ):
+        monkeypatch.delenv(name, raising=False)
+    yield
+
+
 @pytest.fixture
 def user(db):
     return get_user_model().objects.create_user(

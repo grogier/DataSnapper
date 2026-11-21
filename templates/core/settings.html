@@ -44,6 +44,74 @@
         </div>
       </form>
     </div>
+
+    <div class="card">
+      <div class="card-header">
+        <div>
+          <h2 class="card-title">AI assistance</h2>
+          <p class="card-subtitle">Optional. Let a local or cloud LLM help describe and draft requests.</p>
+        </div>
+        <div class="row">
+          {% if llm_status.enabled %}<span class="badge badge-success">enabled</span>{% else %}<span class="badge badge-neutral">disabled</span>{% endif %}
+          {% if llm_status.is_cloud %}<span class="badge badge-warning">cloud endpoint</span>{% else %}<span class="badge badge-success">local endpoint</span>{% endif %}
+        </div>
+      </div>
+      <form method="post">
+        {% csrf_token %}
+        <input type="hidden" name="form_type" value="llm">
+        <div class="card-body">
+          {% if llm_status.overrides %}
+            <div class="flash info">
+              Controlled by the environment and therefore read-only in this form:
+              <strong>{{ llm_status.overrides|join:", " }}</strong>. Environment values win.
+            </div>
+          {% endif %}
+          {% if llm_status.is_cloud %}
+            <div class="flash warning">
+              <strong>This endpoint is not on this machine.</strong>
+              Prompts leave your server and are sent to <span class="mono tiny">{{ llm_status.base_url }}</span>.
+              DeepSeek is a cloud service outside the EU. Keep personal-data sharing off if that
+              matters for your case.
+            </div>
+          {% endif %}
+          <div class="form-grid">
+            {% include "partials/form_fields.html" with form=llm_form %}
+          </div>
+          <div class="divider"></div>
+          <dl class="meta-list">
+            <dt>Endpoint</dt><dd class="mono tiny">{{ llm_status.base_url }}</dd>
+            <dt>Model</dt><dd class="mono tiny">{{ llm_status.model }}</dd>
+            <dt>API key</dt>
+            <dd>
+              {% if not llm_status.key_required %}
+                Not required for this provider or a local endpoint.
+              {% elif llm_status.key_configured %}
+                Configured via <span class="kbd">{{ llm_status.key_env_name }}</span>.
+              {% else %}
+                Not set. Add <span class="kbd">{{ llm_status.key_env_name }}</span> to your
+                environment and restart the container.
+              {% endif %}
+            </dd>
+          </dl>
+          <p class="help mt-2 mb-0">
+            Keys are read from the environment only. They are never stored in the database,
+            shown in this page, or written to logs.
+          </p>
+          <div id="llm-status" class="mt-2"></div>
+          <p class="help mt-1 mb-0">Save the settings before testing the connection.</p>
+        </div>
+        <div class="card-footer form-actions">
+          <button class="btn btn-primary" type="submit">Save AI settings</button>
+          <button class="btn" type="button"
+                  hx-post="{% url 'settings-llm-test' %}"
+                  hx-target="#llm-status" hx-swap="innerHTML"
+                  hx-indicator="#llm-test-spinner">
+            Test connection
+          </button>
+          <span id="llm-test-spinner" class="spinner htmx-indicator"></span>
+        </div>
+      </form>
+    </div>
   </div>
 
   <div class="stack">
@@ -82,10 +150,11 @@ python manage.py verify_audit</pre>
           <li>Identity documents are encrypted at rest with the field key.</li>
           <li>The audit log is hash-chained; run <span class="kbd">verify_audit</span> to check it.</li>
           <li>Serve over HTTPS if the portal is reachable from outside your LAN.</li>
-          <li>No telemetry and no external calls except the links you click.</li>
+          <li>No telemetry. Outbound calls only happen when you enable AI assistance and generate text.</li>
         </ul>
       </div>
     </div>
   </div>
 </div>
+{{ llm_presets|json_script:"llm-presets" }}
 {% endblock %}

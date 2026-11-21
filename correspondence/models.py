@@ -97,6 +97,9 @@ class Message(TimeStampedModel):
     sent_at = models.DateTimeField(null=True, blank=True)
     received_at = models.DateTimeField(null=True, blank=True)
     notes = models.TextField(blank=True)
+    ai_generated = models.BooleanField(default=False)
+    ai_provider = models.CharField(max_length=40, blank=True)
+    ai_model = models.CharField(max_length=120, blank=True)
 
     class Meta:
         ordering = ["-created_at", "-id"]

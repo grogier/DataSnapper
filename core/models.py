@@ -44,6 +44,11 @@ class DataSubject(TimeStampedModel):
 class AppSettings(TimeStampedModel):
     """Singleton row with application-wide preferences."""
 
+    class LLMProvider(models.TextChoices):
+        OLLAMA = "ollama", "Ollama (local)"
+        OPENAI = "openai", "OpenAI-compatible"
+        DEEPSEEK = "deepseek", "DeepSeek (cloud)"
+
     case_prefix = models.CharField(
         max_length=12,
         default="DSAR",
@@ -62,6 +67,41 @@ class AppSettings(TimeStampedModel):
     retention_days = models.PositiveIntegerField(
         default=0,
         help_text="0 keeps case files indefinitely. Otherwise used by the purge command.",
+    )
+    llm_enabled = models.BooleanField(
+        default=False,
+        help_text="Enable AI assistance for drafting requests. Nothing is sent until this is on.",
+    )
+    llm_provider = models.CharField(
+        max_length=20,
+        choices=LLMProvider.choices,
+        default=LLMProvider.OLLAMA,
+    )
+    llm_base_url = models.CharField(
+        max_length=255,
+        default="http://localhost:11434",
+        help_text="For Docker, use http://host.docker.internal:11434 or http://ollama:11434.",
+    )
+    llm_model = models.CharField(
+        max_length=120,
+        default="llama3.1:8b",
+        help_text="Model name understood by the chosen provider.",
+    )
+    llm_timeout = models.PositiveIntegerField(
+        default=120,
+        help_text="Seconds to wait for the LLM. Local models can be slow.",
+    )
+    llm_max_output_tokens = models.PositiveIntegerField(
+        default=1500,
+        help_text="Upper bound for generated tokens.",
+    )
+    llm_reasoning = models.BooleanField(
+        default=False,
+        help_text="Use thinking mode where the provider supports it. Slower, better for complex scope.",
+    )
+    llm_share_personal_data = models.BooleanField(
+        default=False,
+        help_text="Send your name, address and contact details to the LLM. Off keeps placeholders.",
     )
 
     class Meta:
@@ -84,3 +124,9 @@ class AppSettings(TimeStampedModel):
             if part.isdigit():
                 offsets.append(int(part))
         return sorted(set(offsets), reverse=True)
+
+    @property
+    def llm_is_cloud(self) -> bool:
+        from core.llm.providers import endpoint_is_local
+
+        return not endpoint_is_local(self.llm_base_url)

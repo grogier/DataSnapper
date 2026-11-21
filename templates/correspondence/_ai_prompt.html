@@ -1,0 +1,29 @@
+{% if error %}
+  <div class="flash error">{{ error }}</div>
+{% else %}
+  <div class="flash info">
+    This is the exact text that will be sent to <strong>{{ llm.provider }}</strong> at
+    <span class="mono tiny">{{ llm.base_url }}</span>.
+  </div>
+  {% if llm.is_cloud %}
+    <div class="flash warning">
+      This endpoint is outside your machine. Prompt text leaves your server.
+    </div>
+  {% endif %}
+  <details open>
+    <summary class="small"><strong>System prompt</strong></summary>
+    <pre class="message-body mt-1">{{ bundle.system }}</pre>
+  </details>
+  <details class="mt-2">
+    <summary class="small"><strong>User prompt</strong></summary>
+    <pre class="message-body mt-1">{{ bundle.user }}</pre>
+  </details>
+  <div class="small muted mt-2">
+    Prompt v{{ bundle.version }} · SHA-256 {{ bundle.prompt_sha256|slice:":16" }}…
+  </div>
+  <div class="small muted mt-1">
+    Model <span class="mono">{{ llm.model }}</span> ·
+    reasoning {% if llm.reasoning %}on{% else %}off{% endif %} ·
+    max {{ llm.max_tokens }} tokens · timeout {{ llm.timeout }}s
+  </div>
+{% endif %}

@@ -1,0 +1,15 @@
+{% if ok %}
+  <div class="flash success">
+    <strong>{{ result.provider }}</strong> answered in {{ result.duration_ms }} ms using
+    <span class="mono tiny">{{ result.model }}</span>.
+    {% if result.note %}<br>{{ result.note }}{% endif %}
+  </div>
+  {% if result.models %}
+    <div class="small muted">Available models:
+      {% for name in result.models|slice:":12" %}<span class="pill">{{ name }}</span> {% endfor %}
+      {% if result.models|length > 12 %}<span class="pill">+{{ result.models|length|add:"-12" }} more</span>{% endif %}
+    </div>
+  {% endif %}
+{% else %}
+  <div class="flash error"><strong>Connection test failed.</strong><br>{{ error }}</div>
+{% endif %}

@@ -1,17 +1,73 @@
+# DataSnapper runs with sensible local defaults: `docker compose up -d --build`
+# works without a .env file. Every value below can be overridden from the shell,
+# for example:
+#
+#   ADMIN_PASSWORD='a-long-password' docker compose up -d
+#
+# A .env file in this directory is still picked up automatically when present,
+# and has the same effect as exporting the variables. See .env.example.
+
 services:
   app:
     build:
       context: .
       dockerfile: docker/Dockerfile
     image: datasnapper:latest
-    env_file:
-      - .env
     environment:
+      # Storage inside the container. The volume below keeps it on the host.
       DATA_DIR: /data
+
+      DEBUG: ${DEBUG:-0}
+      ALLOWED_HOSTS: ${ALLOWED_HOSTS:-localhost,127.0.0.1,datasnapper.local}
+      CSRF_TRUSTED_ORIGINS: ${CSRF_TRUSTED_ORIGINS:-}
+
+      # Leave empty to generate and persist keys in /data on first start.
+      SECRET_KEY: ${SECRET_KEY:-}
+      FIELD_ENCRYPTION_KEY: ${FIELD_ENCRYPTION_KEY:-}
+
+      TIME_ZONE: ${TIME_ZONE:-Europe/Amsterdam}
+      LANGUAGE_CODE: ${LANGUAGE_CODE:-en}
+
+      # First user, created only when the database has no user yet. When
+      # ADMIN_PASSWORD is empty, a password is generated and printed once in
+      # `docker compose logs app`.
+      ADMIN_USERNAME: ${ADMIN_USERNAME:-admin}
+      ADMIN_EMAIL: ${ADMIN_EMAIL:-}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:-}
+
+      # Only enable when the portal is behind HTTPS.
+      SESSION_COOKIE_SECURE: ${SESSION_COOKIE_SECURE:-0}
+      CSRF_COOKIE_SECURE: ${CSRF_COOKIE_SECURE:-0}
+      SECURE_SSL_REDIRECT: ${SECURE_SSL_REDIRECT:-0}
+      SECURE_HSTS_SECONDS: ${SECURE_HSTS_SECONDS:-0}
+
+      GUNICORN_WORKERS: ${GUNICORN_WORKERS:-2}
+      GUNICORN_THREADS: ${GUNICORN_THREADS:-4}
+      GUNICORN_TIMEOUT: ${GUNICORN_TIMEOUT:-180}
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+
+      # Optional AI assistance. Disabled unless enabled here or in Settings.
+      # Local Ollama: LLM_BASE_URL=http://host.docker.internal:11434 (host)
+      #               or http://ollama:11434 (Compose service).
+      LLM_ENABLED: ${LLM_ENABLED:-0}
+      LLM_PROVIDER: ${LLM_PROVIDER:-ollama}
+      LLM_BASE_URL: ${LLM_BASE_URL:-}
+      LLM_MODEL: ${LLM_MODEL:-}
+      LLM_TIMEOUT: ${LLM_TIMEOUT:-120}
+      LLM_MAX_OUTPUT_TOKENS: ${LLM_MAX_OUTPUT_TOKENS:-1500}
+      LLM_REASONING: ${LLM_REASONING:-0}
+      LLM_SHARE_PERSONAL_DATA: ${LLM_SHARE_PERSONAL_DATA:-0}
+
+      # API keys are read from the environment only, never from the database.
+      DEEPSEEK_API_KEY: ${DEEPSEEK_API_KEY:-}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      LLM_API_KEY: ${LLM_API_KEY:-}
     volumes:
       - ./data:/data
     ports:
       - "8080:8000"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "curl", "-fsS", "http://localhost:8000/healthz"]
@@ -19,6 +75,21 @@ services:
       timeout: 5s
       retries: 3
       start_period: 25s
+
+  # Optional local LLM. Enable with:
+  #   docker compose --profile llm up -d
+  # Then pull a model once:
+  #   docker compose exec ollama ollama pull llama3.1:8b
+  # and set LLM_BASE_URL=http://ollama:11434 for the app.
+  # Also uncomment the ollama volume at the bottom of this file.
+  # ollama:
+  #   image: ollama/ollama
+  #   profiles: ["llm"]
+  #   volumes:
+  #     - ollama:/root/.ollama
+  #   ports:
+  #     - "11434:11434"
+  #   restart: unless-stopped
 
   # Optional HTTPS reverse proxy. Enable with:
   #   docker compose --profile tls up -d
@@ -39,3 +110,4 @@ services:
   # volumes:
   #   caddy_data:
   #   caddy_config:
+  #   ollama:

@@ -52,4 +52,34 @@
       event.returnValue = "";
     });
   });
+
+  // Fill provider defaults when the AI provider changes.
+  var presetsElement = document.getElementById("llm-presets");
+  var providerSelect = document.getElementById("id_llm_provider");
+  if (presetsElement && providerSelect) {
+    var presets = {};
+    try {
+      presets = JSON.parse(presetsElement.textContent);
+    } catch (error) {
+      presets = {};
+    }
+    var knownUrls = [];
+    var knownModels = [];
+    Object.keys(presets).forEach(function (key) {
+      if (presets[key].base_url) knownUrls.push(presets[key].base_url);
+      if (presets[key].model) knownModels.push(presets[key].model);
+    });
+    providerSelect.addEventListener("change", function () {
+      var preset = presets[providerSelect.value];
+      if (!preset) return;
+      var url = document.getElementById("id_llm_base_url");
+      var model = document.getElementById("id_llm_model");
+      if (url && (!url.value || knownUrls.indexOf(url.value) !== -1)) {
+        url.value = preset.base_url;
+      }
+      if (model && (!model.value || knownModels.indexOf(model.value) !== -1)) {
+        model.value = preset.model;
+      }
+    });
+  }
 })();
